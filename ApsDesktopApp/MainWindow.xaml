@@ -4,9 +4,14 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:ApsDesktopApp"
+        xmlns:vm="clr-namespace:ApsDesktopApp.ViewModels"
+        xmlns:models="clr-namespace:ApsDesktopApp.Models"
         mc:Ignorable="d"
         Title="APS Desktop App" Height="520" Width="860"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource WindowBg}"
+        Foreground="{StaticResource TextPri}"
+        FontFamily="Segoe UI" FontSize="13">
     <DockPanel>
 
         <!-- Menu -->
@@ -19,6 +24,8 @@
                           Command="{Binding ConnectCommand}" />
                 <MenuItem Header="_Disconnect"
                           Command="{Binding DisconnectCommand}" />
+                <MenuItem Header="_Refresh projects"
+                          Command="{Binding RefreshProjectsCommand}" />
                 <Separator />
                 <MenuItem Header="_Settings..." Click="Settings_Click" />
             </MenuItem>
@@ -59,27 +66,65 @@
                 <TextBlock Text="APS Desktop App" FontSize="28" FontWeight="SemiBold"
                            HorizontalAlignment="Center" Margin="0,0,0,8" />
                 <TextBlock Text="Connect your Autodesk account to get started."
-                           FontSize="14" Foreground="#555" HorizontalAlignment="Center"
+                           Style="{StaticResource CaptionText}"
+                           FontSize="14" HorizontalAlignment="Center"
                            Margin="0,0,0,20" />
                 <Button Content="Connect to APS" Padding="18,8" FontSize="14"
                         HorizontalAlignment="Center"
+                        Style="{StaticResource PrimaryBtn}"
                         Command="{Binding ConnectCommand}" />
                 <TextBlock Text="Set your Client ID under APS &gt; Settings before connecting."
-                           FontSize="11" Foreground="#888" HorizontalAlignment="Center"
+                           Style="{StaticResource CaptionText}"
+                           FontSize="11" HorizontalAlignment="Center"
                            Margin="0,14,0,0" />
             </StackPanel>
 
-            <!-- Connected view -->
-            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
-                        Visibility="{Binding IsConnected, Converter={StaticResource BoolToVisibility}}">
-                <TextBlock Text="You're connected to APS" FontSize="22" FontWeight="SemiBold"
-                           HorizontalAlignment="Center" Margin="0,0,0,8" />
-                <TextBlock Text="{Binding StatusText}" FontSize="14" Foreground="#555"
-                           HorizontalAlignment="Center" />
-                <TextBlock Text="Tools will appear in the Tools menu as they're added."
-                           FontSize="12" Foreground="#888" HorizontalAlignment="Center"
-                           Margin="0,16,0,0" />
-            </StackPanel>
+            <!-- Connected view: hub/project browser -->
+            <Grid Margin="20"
+                  Visibility="{Binding IsConnected, Converter={StaticResource BoolToVisibility}}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- Header row -->
+                <Grid Grid.Row="0" Margin="0,0,0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Hubs &amp; Projects" FontSize="18" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding StatusText}" Style="{StaticResource CaptionText}" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Content="Refresh" VerticalAlignment="Top" Width="90"
+                            Style="{StaticResource SecondaryBtn}"
+                            Command="{Binding RefreshProjectsCommand}" />
+                </Grid>
+
+                <!-- Loading / empty-state message -->
+                <TextBlock Grid.Row="1" Margin="0,4,0,4" TextWrapping="Wrap"
+                           Style="{StaticResource CaptionText}"
+                           Text="{Binding ProjectsStatus}"
+                           Visibility="{Binding ProjectsStatus, Converter={StaticResource StringToVisibility}}" />
+
+                <!-- Hub -> project tree -->
+                <TreeView Grid.Row="2" ItemsSource="{Binding Hubs}"
+                          Background="Transparent" BorderThickness="0">
+                    <TreeView.Resources>
+                        <HierarchicalDataTemplate DataType="{x:Type vm:HubNode}"
+                                                  ItemsSource="{Binding Projects}">
+                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                            <HierarchicalDataTemplate.ItemTemplate>
+                                <DataTemplate DataType="{x:Type models:Project}">
+                                    <TextBlock Text="{Binding Name}" />
+                                </DataTemplate>
+                            </HierarchicalDataTemplate.ItemTemplate>
+                        </HierarchicalDataTemplate>
+                    </TreeView.Resources>
+                </TreeView>
+            </Grid>
         </Grid>
 
     </DockPanel>
