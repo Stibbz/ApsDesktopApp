@@ -10,6 +10,11 @@ public class AppSettings
     public string ClientId { get; set; } = string.Empty;
     public int CallbackPort { get; set; } = 8080;
 
+    // APS data-residency region for Data Management/OSS calls. We default to
+    // "EMEA" because our accounts live in the European data center; Autodesk's
+    // own API default is "US" (also valid: "APAC").
+    public string Region { get; set; } = "EMEA";
+
     public string RedirectUri => $"http://localhost:{CallbackPort}/callback";
 
     public static AppSettings Load()

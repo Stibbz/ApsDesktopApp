@@ -4,10 +4,15 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="APS Settings" Height="320" Width="540"
-        WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
+        Title="APS Settings" Height="400" Width="540"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        Background="{StaticResource WindowBg}"
+        Foreground="{StaticResource TextPri}"
+        FontFamily="Segoe UI" FontSize="13">
     <Grid Margin="20">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -19,21 +24,35 @@
 
         <TextBlock Grid.Row="0" Text="Autodesk APS Connection" FontSize="18" FontWeight="SemiBold"
                    Margin="0,0,0,4" />
-        <TextBlock Grid.Row="1" TextWrapping="Wrap" Foreground="#555" Margin="0,0,0,16"
-                   Text="Register a 'Desktop, Mobile, Single-Page App' in the APS portal (no client secret needed) and paste its Client ID below." />
+        <TextBlock Grid.Row="1" Style="{StaticResource CaptionText}" Margin="0,0,0,16"
+                   TextWrapping="Wrap">
+            <Run Text="In the APS portal, create an application of type" />
+            <Run Text="&quot;Desktop, Mobile, Single-Page App&quot;" FontWeight="SemiBold"
+                 Foreground="{StaticResource TextPri}" />
+            <Run Text="(uses PKCE, no client secret), then paste its Client ID below." />
+        </TextBlock>
 
         <TextBlock Grid.Row="2" Text="Client ID" FontWeight="SemiBold" Margin="0,0,0,4" />
-        <TextBox Grid.Row="3" x:Name="ClientIdBox" Padding="6" Margin="0,0,0,16" />
+        <TextBox Grid.Row="3" x:Name="ClientIdBox" Style="{StaticResource SettingInput}" Margin="0,0,0,16" />
 
-        <TextBlock Grid.Row="4" Margin="0,0,0,4">
+        <TextBlock Grid.Row="4" Text="Data region" FontWeight="SemiBold" Margin="0,0,0,4" />
+        <ComboBox Grid.Row="5" x:Name="RegionBox" Margin="0,0,0,16" HorizontalAlignment="Left" Width="200">
+            <ComboBoxItem Content="US (United States)" Tag="US" />
+            <ComboBoxItem Content="EMEA (Europe)" Tag="EMEA" />
+            <ComboBoxItem Content="APAC (Australia)" Tag="APAC" />
+        </ComboBox>
+
+        <TextBlock Grid.Row="6" Margin="0,0,0,4">
             <Run Text="Redirect URI (register this exactly in the APS portal):" FontWeight="SemiBold" />
         </TextBlock>
-        <TextBox Grid.Row="5" x:Name="RedirectUriBox" IsReadOnly="True" Padding="6"
-                 VerticalAlignment="Top" Background="#F3F3F3" />
+        <TextBox Grid.Row="7" x:Name="RedirectUriBox" IsReadOnly="True"
+                 Style="{StaticResource SettingInput}" VerticalAlignment="Top" />
 
-        <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
-            <Button Content="Cancel" Width="90" Padding="0,6" Margin="0,0,8,0" IsCancel="True" Click="Cancel_Click" />
-            <Button Content="Save" Width="90" Padding="0,6" IsDefault="True" Click="Save_Click" />
+        <StackPanel Grid.Row="8" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button Content="Cancel" Width="90" Margin="0,0,8,0" IsCancel="True"
+                    Style="{StaticResource SecondaryBtn}" Click="Cancel_Click" />
+            <Button Content="Save" Width="90" IsDefault="True"
+                    Style="{StaticResource PrimaryBtn}" Click="Save_Click" />
         </StackPanel>
     </Grid>
 </Window>
