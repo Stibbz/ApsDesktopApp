@@ -23,6 +23,20 @@ Grows tool-by-tool; sole user now, intended for colleague distribution later.
   on private fields, `[RelayCommand]` on methods. No manual INotifyPropertyChanged.
 - **DI in `App.xaml.cs`** (Microsoft.Extensions.DependencyInjection). `StartupUri`
   is removed from App.xaml; the main window is resolved from the container.
+  Because there is no `StartupUri`, App.xaml is NOT compiled to BAML and its
+  `<Application.Resources>` never load (StaticResource throws at runtime though
+  the build is clean). Register app-wide resources in code in `App.OnStartup`
+  (e.g. `Resources.Add("BoolToVisibility", new BooleanToVisibilityConverter())`).
+- **Shared styles**: `Styles/AppStyles.xaml` is a `ResourceDictionary` (dark theme,
+  adapted from SDX Tools' `SDXStyles.xaml`). Merged into `Application.Resources` in
+  `App.OnStartup` via a `pack://` URI, NOT from App.xaml markup (same BAML reason).
+- **Pin theme on Window roots**: app-level implicit `Style TargetType="Window"` does
+  NOT reliably apply to window roots here (App.xaml isn't BAML-compiled), so each
+  Window sets `Background`/`Foreground`/font explicitly via `{StaticResource ...}`.
+  Implicit styles for controls *inside* the tree work fine.
+- **Dark-theming a Menu dropdown needs a `MenuItem` ControlTemplate** (one style, two
+  templates switched by a `Role` trigger) — the popup background isn't reachable via
+  setters. Keep the `PART_Popup` name.
 
 ## APS Authentication
 - 3-legged OAuth 2.0 with **PKCE (public client, no client secret)**.
@@ -34,8 +48,10 @@ Grows tool-by-tool; sole user now, intended for colleague distribution later.
 ## Layout
 - `Models/` — DTOs (TokenInfo, UserProfile)
 - `Services/` — auth, PKCE, callback server, token/settings storage
+- `Styles/` — shared WPF ResourceDictionary (AppStyles.xaml), merged in App.OnStartup
 - `ViewModels/` — MainViewModel (connection state machine)
-- `Views/` — tool panels added per feature (Phase 2+)
+- `Views/` — tool panels added per feature (Phase 2+); the existing
+  `MainWindow`/`SettingsWindow` XAML live at the project root, not here
 
 ## Known Stubs
 - `ApsAuthService.EnsureValidAccessTokenAsync` throws NotImplementedException
