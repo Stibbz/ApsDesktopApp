@@ -30,9 +30,26 @@ public partial class App : Application
         Resources.Add("StringToVisibility", new Converters.StringToVisibilityConverter());
 
         var services = new ServiceCollection();
+        // Plain HttpClient: the unauthenticated token endpoints use this.
         services.AddSingleton<HttpClient>();
         services.AddSingleton<TokenStorage>();
-        services.AddSingleton<ApsAuthService>();
+        services.AddSingleton<ApsAuthHandler>();
+
+        // ApsAuthService gets two clients: the plain one above for token calls,
+        // and a data client whose ApsAuthHandler injects the bearer token (and
+        // refreshes on 401). The handler resolves ApsAuthService lazily, so this
+        // factory wiring is not a construction cycle.
+        services.AddSingleton<ApsAuthService>(sp =>
+        {
+            var handler = sp.GetRequiredService<ApsAuthHandler>();
+            handler.InnerHandler = new HttpClientHandler();
+            var dataClient = new HttpClient(handler);
+            return new ApsAuthService(
+                sp.GetRequiredService<HttpClient>(),
+                dataClient,
+                sp.GetRequiredService<TokenStorage>());
+        });
+
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainWindow>();
 

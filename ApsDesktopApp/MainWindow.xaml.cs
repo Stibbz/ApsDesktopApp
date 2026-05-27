@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Controls;
 using ApsDesktopApp.Services;
 using ApsDesktopApp.ViewModels;
 
@@ -18,6 +19,35 @@ public partial class MainWindow : Window
 
         // Connecting without a Client ID opens Settings instead of a popup.
         _viewModel.ConfigurationRequested += OnConfigurationRequested;
+
+        // TreeView SelectedItem is read-only (not bindable), and per-node expand
+        // needs the container event, so we bridge both to the ViewModel here.
+        BrowserTree.AddHandler(TreeViewItem.ExpandedEvent,
+            new RoutedEventHandler(OnTreeItemExpanded));
+    }
+
+    // Lazy-load children the first time a project or folder is expanded.
+    private async void OnTreeItemExpanded(object sender, RoutedEventArgs e)
+    {
+        if (e.OriginalSource is not TreeViewItem item)
+            return;
+
+        switch (item.DataContext)
+        {
+            case ProjectNode project:
+                await _viewModel.LoadTopFoldersAsync(project);
+                break;
+            case FolderNode folder when !folder.IsPlaceholder:
+                await _viewModel.LoadSubFoldersAsync(folder);
+                break;
+        }
+    }
+
+    // Selecting a folder loads its files into the details grid.
+    private async void OnTreeSelectionChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+    {
+        if (e.NewValue is FolderNode folder && !folder.IsPlaceholder)
+            await _viewModel.ShowFolderFilesAsync(folder);
     }
 
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();

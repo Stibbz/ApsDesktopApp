@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Threading;
 using System.Threading.Tasks;
@@ -55,6 +56,20 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string _projectsStatus = string.Empty;
 
+    // Files in the currently selected folder, shown in the details grid.
+    public ObservableCollection<FileRow> Files { get; } = new();
+
+    // Name of the folder whose files are displayed (grid header).
+    [ObservableProperty]
+    private string _selectedFolderName = string.Empty;
+
+    [ObservableProperty]
+    private bool _isLoadingFiles;
+
+    // Empty/error guidance for the file grid (e.g. "no files in this folder").
+    [ObservableProperty]
+    private string _filesStatus = string.Empty;
+
     public bool IsConnected => State == ConnectionState.Connected;
     public bool IsDisconnected => State == ConnectionState.Disconnected;
 
@@ -101,6 +116,9 @@ public partial class MainViewModel : ObservableObject
         IsLoadingProjects = true;
         ProjectsStatus = string.Empty;
         Hubs.Clear();
+        Files.Clear();
+        SelectedFolderName = string.Empty;
+        FilesStatus = string.Empty;
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -111,7 +129,10 @@ public partial class MainViewModel : ObservableObject
             {
                 var projects = await _auth.GetProjectsAsync(hub.Id, cts.Token);
                 projectCount += projects.Count;
-                Hubs.Add(new HubNode(hub, projects));
+                var nodes = new List<ProjectNode>(projects.Count);
+                foreach (var project in projects)
+                    nodes.Add(new ProjectNode(project, hub.Id));
+                Hubs.Add(new HubNode(hub, nodes));
             }
 
             if (hubs.Count == 0)
@@ -133,12 +154,90 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    // Loads a project's top-level folders on first expand. The TreeView seeds
+    // each project with a single placeholder child; we swap it for the real
+    // folders here, then mark the node loaded so re-expanding is a no-op.
+    public async Task LoadTopFoldersAsync(ProjectNode project)
+    {
+        if (project.IsLoaded)
+            return;
+        project.IsLoaded = true;
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            var folders = await _auth.GetTopFoldersAsync(project.HubId, project.ProjectId, cts.Token);
+            project.Folders.Clear();
+            foreach (var folder in folders)
+                project.Folders.Add(new FolderNode(folder, project.ProjectId));
+        }
+        catch
+        {
+            // Leave the placeholder removed; a failed load shows an empty node.
+            project.Folders.Clear();
+            project.IsLoaded = false; // allow a retry on next expand
+        }
+    }
+
+    // Loads a folder's subfolders on first expand (same placeholder swap). File
+    // contents are loaded separately on selection (see ShowFolderFilesAsync) so
+    // expanding the tree doesn't disturb the details grid.
+    public async Task LoadSubFoldersAsync(FolderNode folder)
+    {
+        if (folder.IsLoaded)
+            return;
+        folder.IsLoaded = true;
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            var contents = await _auth.GetFolderContentsAsync(folder.ProjectId, folder.FolderId, cts.Token);
+            folder.Children.Clear();
+            foreach (var sub in contents.Folders)
+                folder.Children.Add(new FolderNode(sub, folder.ProjectId));
+        }
+        catch
+        {
+            folder.Children.Clear();
+            folder.IsLoaded = false;
+        }
+    }
+
+    // Loads the selected folder's files into the details grid. Always refetches
+    // (cheap, on explicit user action) so the listing stays current.
+    public async Task ShowFolderFilesAsync(FolderNode folder)
+    {
+        SelectedFolderName = folder.Name;
+        IsLoadingFiles = true;
+        FilesStatus = string.Empty;
+        Files.Clear();
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            var contents = await _auth.GetFolderContentsAsync(folder.ProjectId, folder.FolderId, cts.Token);
+            foreach (var file in contents.Files)
+                Files.Add(new FileRow(file));
+
+            if (Files.Count == 0)
+                FilesStatus = "No files in this folder.";
+        }
+        catch (Exception ex)
+        {
+            FilesStatus = $"Could not load files: {ex.Message}";
+        }
+        finally
+        {
+            IsLoadingFiles = false;
+        }
+    }
+
     [RelayCommand(CanExecute = nameof(CanDisconnect))]
     private void Disconnect()
     {
         _auth.SignOut();
         UserDisplayName = string.Empty;
         Hubs.Clear();
+        Files.Clear();
+        SelectedFolderName = string.Empty;
+        FilesStatus = string.Empty;
         ProjectsStatus = string.Empty;
         State = ConnectionState.Disconnected;
     }
