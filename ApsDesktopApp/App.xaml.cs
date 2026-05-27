@@ -19,7 +19,15 @@ public partial class App : Application
         // App.xaml's <Application.Resources> are NOT compiled/loaded because this
         // App.xaml has no StartupUri (we create MainWindow via DI instead). Register
         // application-scoped resources here so {StaticResource ...} lookups resolve.
+        // Merge the shared theme via a pack URI (the SDX Tools pattern), then add the
+        // keyed converter on top.
+        Resources.MergedDictionaries.Add(new ResourceDictionary
+        {
+            Source = new Uri(
+                "pack://application:,,,/ApsDesktopApp;component/Styles/AppStyles.xaml")
+        });
         Resources.Add("BoolToVisibility", new BooleanToVisibilityConverter());
+        Resources.Add("StringToVisibility", new Converters.StringToVisibilityConverter());
 
         var services = new ServiceCollection();
         services.AddSingleton<HttpClient>();
