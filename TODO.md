@@ -1,22 +1,25 @@
 # ApsDesktopApp - Next Steps
 
-Status as of 2026-05-27: Phase 1 (authenticated WPF shell) complete. OAuth + PKCE
-sign-in works end-to-end; the app lists hubs and their projects in a TreeView.
+Status as of 2026-05-27: Phases 1-2 working end-to-end. OAuth + PKCE sign-in,
+hub/project listing, and the project directory browser (folder tree + file
+details grid) are confirmed against a provisioned ACC test environment.
 Project lives at `C:\Users\sdraak\source\repos\ApsDesktopApp`.
 
 ## Immediate (you)
-- [ ] Implement `ApsAuthService.EnsureValidAccessTokenAsync` (Services/ApsAuthService.cs).
-      Decided behaviour: return token if valid; refresh if expired; on refresh
-      failure call `SignOut()` and return null. Guidance comment is in the file.
-      This clears the CS1998 warning.
+- [x] Finish `ApsAuthService.EnsureValidAccessTokenAsync` (guarded refresh w/
+      SemaphoreSlim, double-check, force-refresh param, cancellation-safe catch).
+- [x] Add `offline_access` to Scopes -- REQUIRED for APS to issue a refresh_token
+      at all. Without it, refresh always fails -> SignOut after ~1h.
+- [ ] ACTION (you): disconnect + reconnect once so APS issues a refresh-capable
+      token under the new scope (the stored token predates offline_access).
 - [x] Register an APS app at https://aps.autodesk.com as a
       "Desktop, Mobile, Single-Page App", callback `http://localhost:8080/callback`.
 - [x] Run the app, open APS > Settings, paste the Client ID, click Connect,
       and verify the green status dot + name.
-- [ ] Provision the app on an ACC/BIM 360 account so hubs/projects are visible:
-      Account Admin > Settings > Custom Integrations, add this app's Client ID.
-      (An empty hub list = not provisioned, NOT a code bug.) For dev, spin up a
-      free ACC trial where you are the account admin and add the Client ID there.
+- [x] Provision the app on an ACC/BIM 360 account (Account Admin > Settings >
+      Custom Integrations, add the Client ID). Done in a dedicated test
+      environment; folder/file reads confirmed there. (Reminder: an empty hub
+      list with HTTP 200 = not provisioned, NOT a code bug.)
 
 ## Verify auth end-to-end
 - [x] "Test connection" replaced by a live hub/project listing (the recognizable
@@ -28,21 +31,28 @@ Project lives at `C:\Users\sdraak\source\repos\ApsDesktopApp`.
 - [x] Hub + project listing: `GetHubsAsync` / `GetProjectsAsync` on ApsAuthService
       (GET /project/v1/hubs, .../hubs/{id}/projects), rendered in a TreeView
       (Hubs -> Projects) in the connected view.
-- [ ] NEXT: Project directory browser + file metadata listing.
-      - Browse a selected project's folder tree (top folders, then folder
-        contents on demand): GET .../projects/{id}/topFolders, then
-        GET .../folders/{folder_id}/contents.
-      - Let the user select a directory (folder) in the tree.
-      - List every file (item) in that directory with its metadata: name, file
-        type, latest version number, size, last-modified date, and who modified
-        it. (Item attributes come from the contents response; deeper props via
-        GET .../items/{item_id} and item versions if needed.)
-      - Display as a details list/grid next to (or below) the folder tree.
-- [ ] Lazy-load folders/files per node rather than eagerly (large projects).
-- [ ] Refactor data calls out of ApsAuthService into a dedicated `ApsDataService`
-      (Services/, WPF-free) so auth and data concerns are separated.
-- [ ] Route every Data Management call through `EnsureValidAccessTokenAsync` for
-      the bearer token (currently they read `CurrentToken.AccessToken` directly).
+- [x] Project directory browser + file metadata listing.
+      - Folder tree (Hub -> Project -> Folders) via GET .../topFolders and
+        GET .../folders/{id}/contents. ApsAuthService.GetTopFoldersAsync /
+        GetFolderContentsAsync; DTOs in Models/FolderContents.cs.
+      - Selecting a folder lists its files in a DataGrid: name, type, version,
+        size, last-modified, modified-by. File metadata is joined from the
+        contents response's "included" tip-version resources.
+      - UI: split TreeView + DataGrid in MainWindow.xaml (GridSplitter between).
+        Tree expand/select bridged to the VM in MainWindow.xaml.cs.
+- [x] Lazy-load folders per node rather than eagerly (placeholder-child trick;
+      project top folders + each folder's subfolders load on first expand).
+- [x] Route every Data Management call through `EnsureValidAccessTokenAsync` via
+      an `ApsAuthHandler : DelegatingHandler` on a dedicated data HttpClient
+      (Services/ApsAuthHandler.cs). It injects the bearer token and retries once
+      on 401 (force-refresh). Token endpoints use a separate plain HttpClient to
+      avoid handler recursion; both wired in App.xaml.cs. Data methods no longer
+      touch tokens.
+- [ ] NEXT: Refactor data calls (GetHubs/GetProjects/GetTopFolders/
+      GetFolderContents + the Extract* helpers) out of ApsAuthService into a
+      dedicated `ApsDataService` (Services/, WPF-free), so auth and data concerns
+      are separated. The data HttpClient (with ApsAuthHandler) moves to that
+      service; ApsAuthService keeps only the plain token client.
 
 ## Phase 3 - Metadata & naming conventions
 - [ ] File metadata inspector panel (item versions, custom attributes/properties).
