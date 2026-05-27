@@ -16,6 +16,7 @@ public class ApsAuthService
     private const string AuthorizeUrl = "https://developer.api.autodesk.com/authentication/v2/authorize";
     private const string TokenUrl = "https://developer.api.autodesk.com/authentication/v2/token";
     private const string UserInfoUrl = "https://api.userprofile.autodesk.com/userinfo";
+    private const string HubsUrl = "https://developer.api.autodesk.com/project/v1/hubs";
     private const string Scopes = "data:read data:write data:create viewables:read";
 
     private readonly HttpClient _http;
@@ -82,6 +83,48 @@ public class ApsAuthService
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         return JsonSerializer.Deserialize<UserProfile>(json);
+    }
+
+    // Lists the hubs (ACC/BIM 360 accounts) visible to the signed-in user.
+    // Requires the data:read scope; a successful call proves the connection
+    // works end-to-end against the Data Management API, not just identity.
+    public async Task<IReadOnlyList<Hub>> GetHubsAsync(CancellationToken cancellationToken)
+    {
+        if (CurrentToken is null)
+            throw new InvalidOperationException("Not connected. Sign in first.");
+
+        // Note: the Data Management hub/project endpoints are NOT region-routed
+        // (region applies to Model Derivative/OSS), so we don't pass a region
+        // query param here -- it would be ignored. The _settings.Region value is
+        // kept for those other APIs as the app grows.
+        var hubs = await GetJsonAsync<HubsResponse>(HubsUrl, cancellationToken);
+        return hubs?.Data ?? new List<Hub>();
+    }
+
+    // Lists the projects inside a hub. A successful call is the clearest proof
+    // the connection works -- the returned names are recognizable projects.
+    public async Task<IReadOnlyList<Project>> GetProjectsAsync(string hubId, CancellationToken cancellationToken)
+    {
+        if (CurrentToken is null)
+            throw new InvalidOperationException("Not connected. Sign in first.");
+
+        var url = $"{HubsUrl}/{Uri.EscapeDataString(hubId)}/projects";
+        var projects = await GetJsonAsync<ProjectsResponse>(url, cancellationToken);
+        return projects?.Data ?? new List<Project>();
+    }
+
+    // Issues an authenticated GET and deserializes the JSON body. Region is
+    // carried per-request via the query string by the callers above.
+    private async Task<T?> GetJsonAsync<T>(string url, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.Add("Authorization", $"Bearer {CurrentToken!.AccessToken}");
+
+        using var response = await _http.SendAsync(request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        return JsonSerializer.Deserialize<T>(json);
     }
 
     public void SignOut()
