@@ -21,6 +21,8 @@ Grows tool-by-tool; sole user now, intended for colleague distribution later.
   chars, em-dashes, or arrows.
 - **`Services/` has zero WPF dependencies** — keeps the service layer portable
   for a future headless/web variant. Only ViewModels/Views reference UI types.
+- **`AppSettings` is not DI-injected**: call `AppSettings.Load()` directly in any service or
+  ViewModel that needs settings; call `.Save()` after mutating. Cheap (small JSON file).
 - **MVVM via CommunityToolkit.Mvvm source generators**: `[ObservableProperty]`
   on private fields, `[RelayCommand]` on methods. No manual INotifyPropertyChanged.
 - **DI in `App.xaml.cs`** (Microsoft.Extensions.DependencyInjection). `StartupUri`
@@ -86,12 +88,22 @@ Grows tool-by-tool; sole user now, intended for colleague distribution later.
 - `Models/` — DTOs (TokenInfo, UserProfile)
 - `Services/` — auth, PKCE, callback server, token/settings storage
 - `Styles/` — shared WPF ResourceDictionary (AppStyles.xaml), merged in App.OnStartup
-- `ViewModels/` — MainViewModel (connection state machine)
-- `Views/` — tool panels added per feature (Phase 2+); the existing
-  `MainWindow`/`SettingsWindow` XAML live at the project root, not here
+- `ViewModels/MainViewModel` — connection state machine; hosts the tool hub
+- `ViewModels/ProjectContextViewModel` — shared singleton for the active hub/project
+  selection. All project-scoped tools inject it and subscribe to `PropertyChanged`
+  (on `SelectedProject`). Never add per-tool hub/project pickers.
+- `ViewModels/DataBrowserViewModel` — starts at the selected project's top folders
+  (not a hub tree). `NavigationPath: ObservableCollection<FolderNode>` tracks breadcrumbs.
+- `Views/` — tool panels added per feature; `MainWindow`/`SettingsWindow` XAML live at
+  the project root, not here
 - `Views/ConvertFileWindow.xaml` — thin Window shell hosting `FileConverterView`;
   opened as a modal popup by the Data Browser right-click flow.
 - `Views/FileConverterView.xaml` — the converter UserControl (format picker, spinner, download).
+- `Views/LogViewerWindow.xaml` — non-modal log viewer, one instance per tool. Each tool
+  code-behind holds a `_logWindow` field and a `ShowLogs_Click` handler. Button placed
+  top-right of the tool's header row.
+- `ViewModels/IToolLifecycle` — interface every tool ViewModel implements: `ActivateAsync()`
+  (called when tool opens; lazy-loads data) and `Reset()` (called on disconnect; clears state).
 
 ## Styles
 - Valid `AppStyles.xaml` resource keys: `WindowBg`, `Surface`, `Elevated`, `Border`, `TextPri`,
@@ -99,15 +111,30 @@ Grows tool-by-tool; sole user now, intended for colleague distribution later.
   -- using either crashes at runtime with no build warning.
 - Each `Window` root must set `Background`/`Foreground`/`FontFamily` explicitly (see Critical Conventions).
 - For left/right split in an action row, use a two-column `Grid` (`Auto` + `*`) -- not `StackPanel` or `DockPanel`.
+- **Dark title bar**: call `DwmSetWindowAttribute(hwnd, 20, ref 1, 4)` (`dwmapi.dll`) in
+  `SourceInitialized` -- NOT the constructor (HWND is null until the OS creates the window).
+- **Grouped ComboBox** (hub headers + project items): create a `CollectionViewSource` in the
+  ViewModel with `new CollectionViewSource { Source = collection }` + `PropertyGroupDescription`,
+  expose as `ICollectionView`. Never use `CollectionViewSource.GetDefaultView` for a grouped
+  view -- it modifies the shared default view and affects all other bindings to that collection.
+- **XAML is strict XML**: `--` inside `<!-- -->` comments is a parse error (MC3000). Use a
+  single `-` or rephrase the sentence.
+- **`Trigger.Property` for attached properties**: use `TypeName.PropertyName` (no parens).
+  Parentheses are property-path syntax for bindings/animations only; using them in
+  `Trigger.Property` causes MC4106.
+- **`AlternationIndex` in templates**: `DataTrigger` + `RelativeSource FindAncestor` inside
+  `DataTemplate.Triggers` is unreliable (index not stamped when trigger evaluates). Use a
+  `ListBox`, put the separator in `ItemContainerStyle` `ControlTemplate`, and use a plain
+  `Trigger Property="ItemsControl.AlternationIndex"`.
+- **Clickable link text**: don't use a transparent `Button` -- the implicit dark-theme style
+  overwrites `Foreground`. Use `TextBlock` + `<MouseBinding MouseAction="LeftClick" Command="..."/>`.
 
 ## Logging
 - `Services/AppLogger` is a DI singleton -- inject it; never use `Debug.WriteLine` or `Console.Write`.
 - Levels: `Debug` (verbose/polling), `Info` (state transitions), `Warn` (handled anomalies), `Error` (exceptions).
 - Log files: `%APPDATA%\ApsDesktopApp\logs\app-YYYY-MM-DD.log`; 7-day retention purged at startup.
 - `AppLogger.FileLogLevel` (default `Debug`) gates file output independently of the in-memory viewer.
-- `Views/LogViewerWindow.xaml` -- non-modal viewer, opened from `FileConverterView.xaml.cs` code-behind
-  using `App.Services.GetRequiredService<T>()` (the static accessor pattern for non-DI windows).
+- `Views/LogViewerWindow.xaml` -- non-modal viewer. Each tool code-behind opens it via a `_logWindow`
+  field + `ShowLogs_Click`. Non-DI windows (like LogViewer itself) resolve deps via
+  `App.Services.GetRequiredService<T>()`.
 
-## Known Stubs
-- (none currently) — `EnsureValidAccessTokenAsync` is now implemented (guarded
-  refresh + 401 retry via `ApsAuthHandler`).
