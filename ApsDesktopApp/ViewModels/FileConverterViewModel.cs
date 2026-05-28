@@ -40,6 +40,10 @@ public partial class FileConverterViewModel : ObservableObject, IToolLifecycle
 
     // -- Observable state ---------------------------------------------------
 
+    // Display name shown in the dialog header (set by the caller before opening).
+    [ObservableProperty]
+    private string _fileName = string.Empty;
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ConvertCommand))]
     [NotifyCanExecuteChangedFor(nameof(CheckStatusCommand))]
@@ -66,6 +70,7 @@ public partial class FileConverterViewModel : ObservableObject, IToolLifecycle
 
     public void Reset()
     {
+        FileName = string.Empty;
         VersionUrn = string.Empty;
         SelectedFormat = null;
         Status = string.Empty;

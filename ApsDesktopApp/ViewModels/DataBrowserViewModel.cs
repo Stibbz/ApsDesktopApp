@@ -18,12 +18,24 @@ public partial class DataBrowserViewModel : ObservableObject, IToolLifecycle
 {
     private readonly ApsDataService _data;
     private readonly NamingRuleEngine _namingRules;
+    private readonly FileConverterViewModel _fileConverter;
 
-    public DataBrowserViewModel(ApsDataService data, NamingRuleEngine namingRules)
+    // Raised when the user chooses to convert the selected file. The View
+    // handles this by opening ConvertFileWindow (WPF concern stays in the view).
+    public event Action? ConvertFileRequested;
+
+    public DataBrowserViewModel(
+        ApsDataService data,
+        NamingRuleEngine namingRules,
+        FileConverterViewModel fileConverter)
     {
         _data = data;
         _namingRules = namingRules;
+        _fileConverter = fileConverter;
     }
+
+    // Exposed so DataBrowserView.xaml.cs can pass it as DataContext to the dialog.
+    public FileConverterViewModel FileConverter => _fileConverter;
 
     // Hubs, each with the projects it contains, shown in the tree.
     public ObservableCollection<HubNode> Hubs { get; } = new();
@@ -49,6 +61,7 @@ public partial class DataBrowserViewModel : ObservableObject, IToolLifecycle
 
     // The file selected in the grid; selecting one loads its version history.
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(OpenConverterCommand))]
     private FileRow? _selectedFile;
 
     public ObservableCollection<VersionRow> SelectedFileVersions { get; } = new();
@@ -201,6 +214,18 @@ public partial class DataBrowserViewModel : ObservableObject, IToolLifecycle
             IsLoadingFiles = false;
             CheckNamingCommand.NotifyCanExecuteChanged();
         }
+    }
+
+    private bool CanOpenConverter() => SelectedFile is not null;
+
+    [RelayCommand(CanExecute = nameof(CanOpenConverter))]
+    private void OpenConverter()
+    {
+        if (SelectedFile is null) return;
+        _fileConverter.Reset();
+        _fileConverter.FileName = SelectedFile.Name;
+        _fileConverter.VersionUrn = SelectedFile.TipVersionUrn;
+        ConvertFileRequested?.Invoke();
     }
 
     private bool CanCheckNaming() => Files.Count > 0;

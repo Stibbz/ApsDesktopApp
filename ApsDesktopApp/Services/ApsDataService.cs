@@ -171,7 +171,8 @@ public class ApsDataService
                 VersionNumber: attrs.VersionNumber ?? 0,
                 SizeBytes: attrs.StorageSize ?? 0,
                 LastModified: attrs.LastModifiedTime,
-                ModifiedBy: attrs.LastModifiedUserName ?? string.Empty));
+                ModifiedBy: attrs.LastModifiedUserName ?? string.Empty,
+                TipVersionUrn: tipId ?? string.Empty));
         }
         return files;
     }

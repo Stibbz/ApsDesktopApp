@@ -93,7 +93,8 @@ public record FileEntry(
     int VersionNumber,
     long SizeBytes,
     DateTimeOffset? LastModified,
-    string ModifiedBy);
+    string ModifiedBy,
+    string TipVersionUrn);
 
 // Folders and files in one directory, as returned by a single contents call.
 public record FolderContents(

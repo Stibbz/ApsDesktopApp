@@ -17,11 +17,14 @@ public class FileRow
         LastModified = entry.LastModified?.LocalDateTime.ToString("yyyy-MM-dd HH:mm")
                        ?? string.Empty;
         ModifiedBy = entry.ModifiedBy;
+        TipVersionUrn = entry.TipVersionUrn;
     }
 
     // Identifiers carried so the metadata inspector can fetch version history.
     public string ItemId { get; }
     public string ProjectId { get; }
+    // URN of the tip (latest) version -- passed directly to Model Derivative.
+    public string TipVersionUrn { get; }
 
     public string Name { get; }
     public string FileType { get; }

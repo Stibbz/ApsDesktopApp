@@ -32,8 +32,7 @@ public partial class MainViewModel : ObservableObject
     public MainViewModel(
         ApsAuthService auth,
         ApsDataService data,
-        DataBrowserViewModel dataBrowser,
-        FileConverterViewModel fileConverter)
+        DataBrowserViewModel dataBrowser)
     {
         _auth = auth;
         _data = data;
@@ -41,14 +40,9 @@ public partial class MainViewModel : ObservableObject
         Tools.Add(new ToolDescriptor(
             "Data Browser",
             "Browse hubs, projects and folders; inspect file metadata, version "
-            + "history, and naming-convention compliance.",
+            + "history, and naming-convention compliance. Right-click any file "
+            + "to convert it to IFC, DWG, OBJ, or STL.",
             "DM", dataBrowser));
-
-        Tools.Add(new ToolDescriptor(
-            "File Converter",
-            "Convert files stored in ACC to IFC, DWG, OBJ, or STL without "
-            + "needing Revit, Navisworks, or any other desktop software.",
-            "FC", fileConverter));
 
         if (_auth.HasStoredToken)
             _ = InitializeFromStoredTokenAsync();

@@ -252,13 +252,21 @@
                 </StackPanel>
 
                 <!-- File grid -->
-                <DataGrid Grid.Row="2"
+                <DataGrid Grid.Row="2" x:Name="FileGrid"
                           ItemsSource="{Binding Files}"
                           SelectedItem="{Binding SelectedFile}"
                           AutoGenerateColumns="False" IsReadOnly="True"
                           CanUserAddRows="False" SelectionMode="Single"
                           GridLinesVisibility="Horizontal"
-                          HeadersVisibility="Column">
+                          HeadersVisibility="Column"
+                          PreviewMouseRightButtonDown="OnFileGridRightClick">
+                    <DataGrid.ContextMenu>
+                        <ContextMenu DataContext="{Binding PlacementTarget.DataContext,
+                                                  RelativeSource={RelativeSource Self}}">
+                            <MenuItem Header="Convert file..."
+                                      Command="{Binding OpenConverterCommand}"/>
+                        </ContextMenu>
+                    </DataGrid.ContextMenu>
                     <DataGrid.Columns>
 
                         <!-- Name: file-type badge + filename -->
