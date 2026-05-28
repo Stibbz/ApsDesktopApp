@@ -69,6 +69,14 @@ public partial class App : Application
         services.AddSingleton<ApsDataService>(sp => new ApsDataService(
             sp.GetRequiredKeyedService<HttpClient>("data"),
             sp.GetRequiredService<ApsAuthService>()));
+        services.AddSingleton<AccIssuesService>(sp => new AccIssuesService(
+            sp.GetRequiredKeyedService<HttpClient>("data"),
+            sp.GetRequiredService<ApsAuthService>(),
+            sp.GetRequiredService<AppLogger>()));
+        services.AddSingleton<AccMembersService>(sp => new AccMembersService(
+            sp.GetRequiredKeyedService<HttpClient>("data"),
+            sp.GetRequiredService<ApsAuthService>(),
+            sp.GetRequiredService<AppLogger>()));
         services.AddSingleton<ModelDerivativeService>(sp => new ModelDerivativeService(
             sp.GetRequiredKeyedService<HttpClient>("modelderivative"),
             sp.GetRequiredService<AppLogger>()));
@@ -82,6 +90,7 @@ public partial class App : Application
         // Tools (one ViewModel each) + the shell that hosts them.
         services.AddSingleton<DataBrowserViewModel>();
         services.AddSingleton<FileConverterViewModel>();
+        services.AddSingleton<IssuesViewModel>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainWindow>();
 

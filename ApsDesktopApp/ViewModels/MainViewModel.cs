@@ -32,7 +32,8 @@ public partial class MainViewModel : ObservableObject
     public MainViewModel(
         ApsAuthService auth,
         ApsDataService data,
-        DataBrowserViewModel dataBrowser)
+        DataBrowserViewModel dataBrowser,
+        IssuesViewModel issues)
     {
         _auth = auth;
         _data = data;
@@ -43,6 +44,13 @@ public partial class MainViewModel : ObservableObject
             + "history, and naming-convention compliance. Right-click any file "
             + "to convert it to IFC, DWG, OBJ, or STL.",
             "DM", dataBrowser));
+
+        Tools.Add(new ToolDescriptor(
+            "Issues Manager",
+            "Load all ACC issues for a project into a sortable, searchable table. "
+            + "Export to Excel for bulk editing, then import the workbook to push "
+            + "changes back to ACC.",
+            "IS", issues));
 
         if (_auth.HasStoredToken)
             _ = InitializeFromStoredTokenAsync();
