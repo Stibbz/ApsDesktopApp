@@ -20,4 +20,5 @@ public static class AppPaths
 
     public static string SettingsFile => Path.Combine(DataDirectory, "settings.json");
     public static string TokensFile => Path.Combine(DataDirectory, "tokens.dat");
+    public static string MdSecretFile => Path.Combine(DataDirectory, "md_secret.dat");
 }

@@ -3,12 +3,16 @@ using System.Text.Json;
 
 namespace ApsDesktopApp.Services;
 
-// Non-secret configuration. With PKCE there is no client secret to protect,
-// so the Client ID is stored as plain JSON.
+// Non-secret configuration stored as plain JSON. Secrets (e.g. the Model
+// Derivative client secret) are kept separately in SecretStorage (DPAPI).
 public class AppSettings
 {
     public string ClientId { get; set; } = string.Empty;
     public int CallbackPort { get; set; } = 8080;
+
+    // Client ID of the separate "Server-side Web App" APS app used for
+    // 2-legged Model Derivative calls. Its client secret lives in SecretStorage.
+    public string ModelDerivativeClientId { get; set; } = string.Empty;
 
     // APS data-residency region for Data Management/OSS calls. We default to
     // "EMEA" because our accounts live in the European data center; Autodesk's

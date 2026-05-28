@@ -4,13 +4,14 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="APS Settings" Height="400" Width="540"
+        Title="APS Settings" Height="620" Width="540"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
         Background="{StaticResource WindowBg}"
         Foreground="{StaticResource TextPri}"
         FontFamily="Segoe UI" FontSize="13">
     <Grid Margin="20">
         <Grid.RowDefinitions>
+            <!-- Data Management (3-legged) section -->
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -18,18 +19,26 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <!-- Model Derivative (2-legged) section -->
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <!-- spacer + buttons -->
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Text="Autodesk APS Connection" FontSize="18" FontWeight="SemiBold"
+        <!-- ── Data Management (3-legged) ───────────────────────── -->
+        <TextBlock Grid.Row="0" Text="Data Management App" FontSize="16" FontWeight="SemiBold"
                    Margin="0,0,0,4" />
         <TextBlock Grid.Row="1" Style="{StaticResource CaptionText}" Margin="0,0,0,16"
                    TextWrapping="Wrap">
-            <Run Text="In the APS portal, create an application of type" />
-            <Run Text="&quot;Desktop, Mobile, Single-Page App&quot;" FontWeight="SemiBold"
-                 Foreground="{StaticResource TextPri}" />
-            <Run Text="(uses PKCE, no client secret), then paste its Client ID below." />
+            <Run Text="Type:" FontWeight="SemiBold" />
+            <Run Text="Desktop, Mobile, Single-Page App (PKCE - no client secret)." />
         </TextBlock>
 
         <TextBlock Grid.Row="2" Text="Client ID" FontWeight="SemiBold" Margin="0,0,0,4" />
@@ -46,9 +55,31 @@
             <Run Text="Redirect URI (register this exactly in the APS portal):" FontWeight="SemiBold" />
         </TextBlock>
         <TextBox Grid.Row="7" x:Name="RedirectUriBox" IsReadOnly="True"
-                 Style="{StaticResource SettingInput}" VerticalAlignment="Top" />
+                 Style="{StaticResource SettingInput}" Margin="0,0,0,20" />
 
-        <StackPanel Grid.Row="8" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+        <!-- ── Model Derivative App (2-legged) ──────────────────── -->
+        <TextBlock Grid.Row="8" Text="Model Derivative App" FontSize="16" FontWeight="SemiBold"
+                   Margin="0,0,0,4" />
+        <TextBlock Grid.Row="9" Style="{StaticResource CaptionText}" Margin="0,0,0,16"
+                   TextWrapping="Wrap">
+            <Run Text="Type:" FontWeight="SemiBold" />
+            <Run Text="Server-side Web App (has client secret, enables Model Derivative API)." />
+        </TextBlock>
+
+        <TextBlock Grid.Row="10" Text="Client ID" FontWeight="SemiBold" Margin="0,0,0,4" />
+        <TextBox Grid.Row="11" x:Name="MdClientIdBox" Style="{StaticResource SettingInput}" Margin="0,0,0,12" />
+
+        <TextBlock Grid.Row="12" Text="Client Secret" FontWeight="SemiBold" Margin="0,0,0,4" />
+        <PasswordBox Grid.Row="13" x:Name="MdClientSecretBox"
+                     Background="{StaticResource Surface}"
+                     Foreground="{StaticResource TextPri}"
+                     BorderBrush="{StaticResource Border}"
+                     BorderThickness="1" Padding="8,5"
+                     Height="32"
+                     PasswordChar="*" />
+
+        <!-- ── Buttons ───────────────────────────────────────────── -->
+        <StackPanel Grid.Row="15" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
             <Button Content="Cancel" Width="90" Margin="0,0,8,0" IsCancel="True"
                     Style="{StaticResource SecondaryBtn}" Click="Cancel_Click" />
             <Button Content="Save" Width="90" IsDefault="True"
