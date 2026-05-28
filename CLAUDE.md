@@ -54,6 +54,19 @@ Grows tool-by-tool; sole user now, intended for colleague distribution later.
 - Config + tokens live in `%APPDATA%\ApsDesktopApp` (settings.json, tokens.dat).
 - Tokens are DPAPI-encrypted (CurrentUser scope) — not portable between machines.
 
+## Model Derivative API
+- Requires a **separate "Server-side Web App" APS app** in the portal — the "Desktop/Mobile/SPA"
+  type cannot enable Model Derivative. AUTH-001 error = wrong app type, not a scope issue.
+- Uses **2-legged OAuth (client_credentials)**: `TwoLeggedTokenService` fetches/caches the token;
+  `TwoLeggedAuthHandler` injects it. Client ID stored in `settings.json`; client secret
+  DPAPI-encrypted at `%APPDATA%\ApsDesktopApp\md_secret.dat` via `SecretStorage`.
+- Three keyed HttpClients in DI: plain (token endpoints), `"data"` (3-legged), `"modelderivative"` (2-legged).
+- `EnsureSuccessAsync` in `ModelDerivativeService` reads the APS error body before throwing --
+  always use it instead of `EnsureSuccessStatusCode()` so error detail is not discarded.
+- **Always send `x-ads-force: true`** on POST `/job` -- without it, APS returns HTTP 201 but
+  silently skips adding a new format to an already-complete manifest (ACC auto-processes files
+  to SVF on upload, so manifests are almost always pre-existing and complete).
+
 ## Data Management API
 - `topFolders` is under **project/v1** (`.../hubs/{h}/projects/{p}/topFolders`);
   folder **contents** is under **data/v1** (`.../projects/{p}/folders/{f}/contents`)
@@ -69,6 +82,24 @@ Grows tool-by-tool; sole user now, intended for colleague distribution later.
 - `ViewModels/` — MainViewModel (connection state machine)
 - `Views/` — tool panels added per feature (Phase 2+); the existing
   `MainWindow`/`SettingsWindow` XAML live at the project root, not here
+- `Views/ConvertFileWindow.xaml` — thin Window shell hosting `FileConverterView`;
+  opened as a modal popup by the Data Browser right-click flow.
+- `Views/FileConverterView.xaml` — the converter UserControl (format picker, spinner, download).
+
+## Styles
+- Valid `AppStyles.xaml` resource keys: `WindowBg`, `Surface`, `Elevated`, `Border`, `TextPri`,
+  `TextMuted`, `Accent`, `AccentHover`, `AccentPress`. **`InputBg` and `TextSec` do not exist**
+  -- using either crashes at runtime with no build warning.
+- Each `Window` root must set `Background`/`Foreground`/`FontFamily` explicitly (see Critical Conventions).
+- For left/right split in an action row, use a two-column `Grid` (`Auto` + `*`) -- not `StackPanel` or `DockPanel`.
+
+## Logging
+- `Services/AppLogger` is a DI singleton -- inject it; never use `Debug.WriteLine` or `Console.Write`.
+- Levels: `Debug` (verbose/polling), `Info` (state transitions), `Warn` (handled anomalies), `Error` (exceptions).
+- Log files: `%APPDATA%\ApsDesktopApp\logs\app-YYYY-MM-DD.log`; 7-day retention purged at startup.
+- `AppLogger.FileLogLevel` (default `Debug`) gates file output independently of the in-memory viewer.
+- `Views/LogViewerWindow.xaml` -- non-modal viewer, opened from `FileConverterView.xaml.cs` code-behind
+  using `App.Services.GetRequiredService<T>()` (the static accessor pattern for non-DI windows).
 
 ## Known Stubs
 - (none currently) — `EnsureValidAccessTokenAsync` is now implemented (guarded
