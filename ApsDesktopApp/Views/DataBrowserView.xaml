@@ -5,162 +5,369 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:ApsDesktopApp.ViewModels"
              mc:Ignorable="d">
+    <UserControl.Resources>
+
+        <!-- Chevron toggle button: right-pointing arrow that flips down when expanded. -->
+        <Style x:Key="ChevronToggle" TargetType="ToggleButton">
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Width" Value="20"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border Background="Transparent">
+                            <Path x:Name="Arrow"
+                                  Data="M 5 3 L 11 8 L 5 13"
+                                  Stroke="{StaticResource TextMuted}" StrokeThickness="1.5"
+                                  StrokeLineJoin="Round" StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Arrow" Property="Data"
+                                        Value="M 3 5 L 8 11 L 13 5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Implicit TreeViewItem: replaces the WPF default to give us a clean chevron,
+             hover highlight, and accent selection. Scoped to this UserControl only. -->
+        <Style TargetType="TreeViewItem">
+            <Setter Property="Foreground" Value="{StaticResource TextPri}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TreeViewItem">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Border x:Name="Bd" Grid.Row="0"
+                                    Background="Transparent" CornerRadius="4"
+                                    Margin="0,1,4,1" Padding="2,4">
+                                <StackPanel Orientation="Horizontal">
+                                    <ToggleButton x:Name="Expander"
+                                                  Style="{StaticResource ChevronToggle}"
+                                                  IsChecked="{Binding IsExpanded, Mode=TwoWay,
+                                                              RelativeSource={RelativeSource TemplatedParent}}"
+                                                  ClickMode="Press"/>
+                                    <ContentPresenter x:Name="PART_Header"
+                                                      ContentSource="Header"
+                                                      VerticalAlignment="Center"
+                                                      Margin="2,0,0,0"/>
+                                </StackPanel>
+                            </Border>
+                            <ItemsPresenter x:Name="ItemsHost" Grid.Row="1" Margin="14,0,0,0"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsExpanded" Value="False">
+                                <Setter TargetName="ItemsHost" Property="Visibility" Value="Collapsed"/>
+                            </Trigger>
+                            <Trigger Property="HasItems" Value="False">
+                                <Setter TargetName="Expander" Property="Visibility" Value="Hidden"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource Accent}"/>
+                            </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsMouseOver" Value="True"/>
+                                    <Condition Property="IsSelected" Value="False"/>
+                                </MultiTrigger.Conditions>
+                                <MultiTrigger.Setters>
+                                    <Setter TargetName="Bd" Property="Background" Value="{StaticResource Surface}"/>
+                                </MultiTrigger.Setters>
+                            </MultiTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- DataGrid row with hover state (extends the app-wide style). -->
+        <Style TargetType="DataGridRow">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPri}"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Style.Triggers>
+                <MultiTrigger>
+                    <MultiTrigger.Conditions>
+                        <Condition Property="IsMouseOver" Value="True"/>
+                        <Condition Property="IsSelected" Value="False"/>
+                    </MultiTrigger.Conditions>
+                    <MultiTrigger.Setters>
+                        <Setter Property="Background" Value="{StaticResource Surface}"/>
+                    </MultiTrigger.Setters>
+                </MultiTrigger>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="{StaticResource Accent}"/>
+                    <Setter Property="Foreground" Value="White"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+    </UserControl.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <Grid Grid.Row="0" Margin="0,0,0,4">
+        <Grid Grid.Row="0" Margin="0,0,0,6">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <TextBlock Grid.Column="0" Text="Hubs &amp; Projects"
-                       FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
+                       FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/>
             <Button Grid.Column="1" Content="Refresh" Width="90"
                     Style="{StaticResource SecondaryBtn}"
-                    Command="{Binding RefreshProjectsCommand}" />
+                    Command="{Binding RefreshProjectsCommand}"/>
         </Grid>
 
         <!-- Loading / empty-state message -->
-        <TextBlock Grid.Row="1" Margin="0,4,0,4" TextWrapping="Wrap"
+        <TextBlock Grid.Row="1" Margin="0,0,0,6" TextWrapping="Wrap"
                    Style="{StaticResource CaptionText}"
                    Text="{Binding ProjectsStatus}"
-                   Visibility="{Binding ProjectsStatus, Converter={StaticResource StringToVisibility}}" />
+                   Visibility="{Binding ProjectsStatus, Converter={StaticResource StringToVisibility}}"/>
 
-        <!-- Browser: folder tree (left) + file details/inspector (right) -->
+        <!-- Browser: folder tree (left) + file inspector (right) -->
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="2*" MinWidth="200" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="3*" MinWidth="260" />
+                <ColumnDefinition Width="2*" MinWidth="180"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="3*" MinWidth="300"/>
             </Grid.ColumnDefinitions>
 
+            <!-- Folder tree -->
             <TreeView x:Name="BrowserTree" Grid.Column="0"
                       ItemsSource="{Binding Hubs}"
                       SelectedItemChanged="OnTreeSelectionChanged"
-                      Background="Transparent" BorderThickness="0">
+                      Background="Transparent" BorderThickness="0"
+                      VirtualizingPanel.IsVirtualizing="True">
                 <TreeView.Resources>
+
                     <HierarchicalDataTemplate DataType="{x:Type vm:HubNode}"
                                               ItemsSource="{Binding Projects}">
-                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                        <StackPanel Orientation="Horizontal">
+                            <!-- Hub: small accent circle badge -->
+                            <Border Width="20" Height="20" CornerRadius="10"
+                                    Background="{StaticResource Accent}"
+                                    Margin="0,0,7,0" VerticalAlignment="Center">
+                                <TextBlock Text="H" FontSize="10" FontWeight="Bold"
+                                           Foreground="White"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
                     </HierarchicalDataTemplate>
+
                     <HierarchicalDataTemplate DataType="{x:Type vm:ProjectNode}"
                                               ItemsSource="{Binding Folders}">
-                        <TextBlock Text="{Binding Name}" />
+                        <StackPanel Orientation="Horizontal">
+                            <!-- Project: Segoe MDL2 folder icon, accent tinted -->
+                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8B7;"
+                                       FontSize="14" Foreground="{StaticResource Accent}"
+                                       Margin="0,0,7,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                        </StackPanel>
                     </HierarchicalDataTemplate>
+
                     <HierarchicalDataTemplate DataType="{x:Type vm:FolderNode}"
                                               ItemsSource="{Binding Children}">
-                        <TextBlock Text="{Binding Name}" />
+                        <StackPanel Orientation="Horizontal">
+                            <!-- Folder: same icon, muted color -->
+                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8B7;"
+                                       FontSize="13" Foreground="{StaticResource TextMuted}"
+                                       Margin="0,0,7,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                        </StackPanel>
                     </HierarchicalDataTemplate>
+
                 </TreeView.Resources>
             </TreeView>
 
             <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center"
-                          VerticalAlignment="Stretch"
-                          Background="{StaticResource Border}" />
+                          VerticalAlignment="Stretch" Background="{StaticResource Border}"/>
 
-            <!-- Right column: file grid (top) + metadata inspector (bottom) -->
+            <!-- Right column: toolbar + file grid + splitter + version history -->
             <Grid Grid.Column="2" Margin="8,0,0,0">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="2*" MinHeight="120" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" MinHeight="100" />
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="2*" MinHeight="120"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*" MinHeight="100"/>
                 </Grid.RowDefinitions>
 
+                <!-- File list toolbar -->
                 <Grid Grid.Row="0" Margin="0,0,0,4">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" FontWeight="SemiBold"
-                               VerticalAlignment="Center"
-                               Text="{Binding SelectedFolderName, TargetNullValue='Files',
-                                              FallbackValue='Files'}" />
+                    <TextBlock Grid.Column="0" FontWeight="SemiBold" VerticalAlignment="Center"
+                               Text="{Binding SelectedFolderName,
+                                      TargetNullValue='Files', FallbackValue='Files'}"/>
                     <Button Grid.Column="1" Content="Check naming" Width="110"
                             Style="{StaticResource SecondaryBtn}"
-                            Command="{Binding CheckNamingCommand}" />
+                            Command="{Binding CheckNamingCommand}"/>
                 </Grid>
 
+                <!-- Status + naming violations -->
                 <StackPanel Grid.Row="1" Margin="0,0,0,4">
-                    <TextBlock TextWrapping="Wrap"
-                               Style="{StaticResource CaptionText}"
+                    <TextBlock TextWrapping="Wrap" Style="{StaticResource CaptionText}"
                                Text="{Binding FilesStatus}"
                                Visibility="{Binding FilesStatus,
-                                            Converter={StaticResource StringToVisibility}}" />
+                                            Converter={StaticResource StringToVisibility}}"/>
                     <TextBlock TextWrapping="Wrap" Margin="0,2,0,0"
                                Style="{StaticResource CaptionText}"
                                Text="{Binding NamingStatus}"
                                Visibility="{Binding NamingStatus,
-                                            Converter={StaticResource StringToVisibility}}" />
+                                            Converter={StaticResource StringToVisibility}}"/>
                     <ItemsControl ItemsSource="{Binding NamingViolations}" Margin="0,2,0,0">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <TextBlock TextWrapping="Wrap" Foreground="#E08A7A" Margin="0,1,0,1">
-                                    <Run Text="{Binding FileName, Mode=OneWay}" FontWeight="SemiBold" />
-                                    <Run Text=" - " />
-                                    <Run Text="{Binding Message, Mode=OneWay}" />
+                                <TextBlock TextWrapping="Wrap" Foreground="#E08A7A"
+                                           Margin="0,1,0,1">
+                                    <Run Text="{Binding FileName, Mode=OneWay}"
+                                         FontWeight="SemiBold"/>
+                                    <Run Text=" - "/>
+                                    <Run Text="{Binding Message, Mode=OneWay}"/>
                                 </TextBlock>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </StackPanel>
 
-                <DataGrid Grid.Row="2" ItemsSource="{Binding Files}"
+                <!-- File grid -->
+                <DataGrid Grid.Row="2"
+                          ItemsSource="{Binding Files}"
                           SelectedItem="{Binding SelectedFile}"
                           AutoGenerateColumns="False" IsReadOnly="True"
-                          CanUserAddRows="False" GridLinesVisibility="Horizontal"
-                          HeadersVisibility="Column" SelectionMode="Single">
+                          CanUserAddRows="False" SelectionMode="Single"
+                          GridLinesVisibility="Horizontal"
+                          HeadersVisibility="Column">
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*" />
-                        <DataGridTextColumn Header="Type" Binding="{Binding FileType}" Width="Auto" />
-                        <DataGridTextColumn Header="Ver" Binding="{Binding Version}" Width="Auto" />
-                        <DataGridTextColumn Header="Size" Binding="{Binding Size}" Width="Auto" />
-                        <DataGridTextColumn Header="Modified" Binding="{Binding LastModified}" Width="Auto" />
-                        <DataGridTextColumn Header="Modified by" Binding="{Binding ModifiedBy}" Width="*" />
+
+                        <!-- Name: file-type badge + filename -->
+                        <DataGridTemplateColumn Header="Name" Width="2*" SortMemberPath="Name">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal" Margin="4,0">
+                                        <Border Width="34" Height="20" CornerRadius="3"
+                                                Background="#2E5E8E"
+                                                Margin="0,0,8,0" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding FileType}"
+                                                       FontSize="9" FontWeight="SemiBold"
+                                                       Foreground="White"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"/>
+                                        </Border>
+                                        <TextBlock Text="{Binding Name}"
+                                                   VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <!-- Version: rounded pill badge (accent border + text) -->
+                        <DataGridTemplateColumn Header="Version" Width="76"
+                                                SortMemberPath="Version">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Border CornerRadius="10"
+                                            BorderBrush="{StaticResource Accent}"
+                                            BorderThickness="1"
+                                            Padding="8,2" Margin="4,0"
+                                            HorizontalAlignment="Left"
+                                            Visibility="{Binding Version,
+                                                         Converter={StaticResource StringToVisibility}}">
+                                        <TextBlock Text="{Binding Version}" FontSize="11"
+                                                   Foreground="{StaticResource Accent}"/>
+                                    </Border>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <DataGridTextColumn Header="Size"
+                                            Binding="{Binding Size}" Width="70"/>
+                        <DataGridTextColumn Header="Modified"
+                                            Binding="{Binding LastModified}" Width="Auto"/>
+                        <DataGridTextColumn Header="Modified by"
+                                            Binding="{Binding ModifiedBy}" Width="*"/>
                     </DataGrid.Columns>
                 </DataGrid>
 
                 <GridSplitter Grid.Row="3" Height="5" HorizontalAlignment="Stretch"
                               VerticalAlignment="Center" Margin="0,4"
-                              Background="{StaticResource Border}" />
+                              Background="{StaticResource Border}"/>
 
-                <!-- Metadata inspector: version history of the selected file -->
+                <!-- Version history -->
                 <Grid Grid.Row="4">
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
                     <TextBlock Grid.Row="0" FontWeight="SemiBold" Margin="0,0,0,4"
-                               Text="{Binding SelectedFile.Name, TargetNullValue='Version history',
-                                              FallbackValue='Version history'}" />
+                               Text="{Binding SelectedFile.Name,
+                                      TargetNullValue='Version history',
+                                      FallbackValue='Version history'}"/>
 
                     <TextBlock Grid.Row="1" Margin="0,0,0,4" TextWrapping="Wrap"
                                Style="{StaticResource CaptionText}"
                                Text="{Binding VersionsStatus}"
                                Visibility="{Binding VersionsStatus,
-                                            Converter={StaticResource StringToVisibility}}" />
+                                            Converter={StaticResource StringToVisibility}}"/>
 
                     <DataGrid Grid.Row="2" ItemsSource="{Binding SelectedFileVersions}"
                               AutoGenerateColumns="False" IsReadOnly="True"
                               CanUserAddRows="False" GridLinesVisibility="Horizontal"
                               HeadersVisibility="Column">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Ver" Binding="{Binding Version}" Width="Auto" />
-                            <DataGridTextColumn Header="Type" Binding="{Binding FileType}" Width="Auto" />
-                            <DataGridTextColumn Header="Size" Binding="{Binding Size}" Width="Auto" />
-                            <DataGridTextColumn Header="Modified" Binding="{Binding LastModified}" Width="Auto" />
-                            <DataGridTextColumn Header="Modified by" Binding="{Binding ModifiedBy}" Width="*" />
+                            <DataGridTemplateColumn Header="Version" Width="76"
+                                                    SortMemberPath="Version">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border CornerRadius="10"
+                                                BorderBrush="{StaticResource Accent}"
+                                                BorderThickness="1"
+                                                Padding="8,2" Margin="4,0"
+                                                HorizontalAlignment="Left"
+                                                Visibility="{Binding Version,
+                                                             Converter={StaticResource StringToVisibility}}">
+                                            <TextBlock Text="{Binding Version}" FontSize="11"
+                                                       Foreground="{StaticResource Accent}"/>
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="Type"
+                                                Binding="{Binding FileType}" Width="Auto"/>
+                            <DataGridTextColumn Header="Size"
+                                                Binding="{Binding Size}" Width="Auto"/>
+                            <DataGridTextColumn Header="Modified"
+                                                Binding="{Binding LastModified}" Width="Auto"/>
+                            <DataGridTextColumn Header="Modified by"
+                                                Binding="{Binding ModifiedBy}" Width="*"/>
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>
+
             </Grid>
         </Grid>
     </Grid>
