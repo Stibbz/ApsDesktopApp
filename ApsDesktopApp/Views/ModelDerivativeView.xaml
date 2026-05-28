@@ -7,9 +7,9 @@
     <StackPanel MaxWidth="640" HorizontalAlignment="Left">
         <TextBlock Text="Model Derivative" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,4" />
         <TextBlock Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,0,0,16"
-                   Text="Paste a model version URN (urn:adsk.wipprod:fs.file:vf...?version=N), start an SVF2 translation, then poll the manifest. Requests are routed to the region set in Settings." />
+                   Text="Convert a model file stored in ACC so it can be viewed in a web browser. Paste the version link from the Data Browser, click Translate to start the conversion, then use Check status to see if it is ready." />
 
-        <TextBlock Text="Version URN" FontWeight="SemiBold" Margin="0,0,0,4" />
+        <TextBlock Text="Version link" FontWeight="SemiBold" Margin="0,0,0,4" />
         <TextBox Style="{StaticResource SettingInput}" Margin="0,0,0,12"
                  Text="{Binding VersionUrn, UpdateSourceTrigger=PropertyChanged}" />
 

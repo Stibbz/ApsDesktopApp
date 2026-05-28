@@ -32,8 +32,7 @@ public partial class MainViewModel : ObservableObject
     public MainViewModel(
         ApsAuthService auth,
         ApsDataService data,
-        DataBrowserViewModel dataBrowser,
-        ModelDerivativeViewModel modelDerivative)
+        DataBrowserViewModel dataBrowser)
     {
         _auth = auth;
         _data = data;
@@ -43,10 +42,6 @@ public partial class MainViewModel : ObservableObject
             "Browse hubs, projects and folders; inspect file metadata, version "
             + "history, and naming-convention compliance.",
             "DM", dataBrowser));
-        Tools.Add(new ToolDescriptor(
-            "Model Derivative",
-            "Translate a model version to SVF2 and track manifest status.",
-            "MD", modelDerivative));
 
         if (_auth.HasStoredToken)
             _ = InitializeFromStoredTokenAsync();
