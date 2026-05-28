@@ -7,7 +7,7 @@
              mc:Ignorable="d">
     <UserControl.Resources>
 
-        <!-- Chevron toggle button: right-pointing arrow that flips down when expanded. -->
+        <!-- Chevron toggle button -->
         <Style x:Key="ChevronToggle" TargetType="ToggleButton">
             <Setter Property="Focusable" Value="False"/>
             <Setter Property="Width" Value="20"/>
@@ -34,8 +34,7 @@
             </Setter>
         </Style>
 
-        <!-- Implicit TreeViewItem: replaces the WPF default to give us a clean chevron,
-             hover highlight, and accent selection. Scoped to this UserControl only. -->
+        <!-- TreeViewItem: clean chevron, hover highlight, accent selection. -->
         <Style TargetType="TreeViewItem">
             <Setter Property="Foreground" Value="{StaticResource TextPri}"/>
             <Setter Property="Background" Value="Transparent"/>
@@ -89,7 +88,7 @@
             </Setter>
         </Style>
 
-        <!-- DataGrid row with hover state (extends the app-wide style). -->
+        <!-- DataGrid row with hover state -->
         <Style TargetType="DataGridRow">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="{StaticResource TextPri}"/>
@@ -116,31 +115,37 @@
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>   <!-- header -->
+            <RowDefinition Height="Auto"/>   <!-- status / hint -->
+            <RowDefinition Height="*"/>      <!-- browser split -->
         </Grid.RowDefinitions>
 
-        <!-- Header -->
+        <!-- Header: title left, Refresh + Logs right -->
         <Grid Grid.Row="0" Margin="0,0,0,6">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <TextBlock Grid.Column="0" Text="Hubs &amp; Projects"
+            <TextBlock Grid.Column="0" Text="Data Browser"
                        FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/>
-            <Button Grid.Column="1" Content="Refresh" Width="90"
-                    Style="{StaticResource SecondaryBtn}"
-                    Command="{Binding RefreshProjectsCommand}"/>
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Content="Refresh" Width="90"
+                        Style="{StaticResource SecondaryBtn}"
+                        Command="{Binding RefreshFoldersCommand}"
+                        Margin="0,0,8,0"/>
+                <Button Content="Logs" Width="56"
+                        ToolTip="View application log"
+                        Click="ShowLogs_Click"/>
+            </StackPanel>
         </Grid>
 
-        <!-- Loading / empty-state message -->
+        <!-- Status / hint row -->
         <TextBlock Grid.Row="1" Margin="0,0,0,6" TextWrapping="Wrap"
                    Style="{StaticResource CaptionText}"
                    Text="{Binding ProjectsStatus}"
                    Visibility="{Binding ProjectsStatus, Converter={StaticResource StringToVisibility}}"/>
 
-        <!-- Browser: folder tree (left) + file inspector (right) -->
+        <!-- Browser: folder tree (left) + content inspector (right) -->
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="2*" MinWidth="180"/>
@@ -148,60 +153,29 @@
                 <ColumnDefinition Width="3*" MinWidth="300"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Folder tree -->
+            <!-- Left: folder tree (starts at project top folders) -->
             <TreeView x:Name="BrowserTree" Grid.Column="0"
-                      ItemsSource="{Binding Hubs}"
+                      ItemsSource="{Binding Folders}"
                       SelectedItemChanged="OnTreeSelectionChanged"
                       Background="Transparent" BorderThickness="0"
                       VirtualizingPanel.IsVirtualizing="True">
                 <TreeView.Resources>
-
-                    <HierarchicalDataTemplate DataType="{x:Type vm:HubNode}"
-                                              ItemsSource="{Binding Projects}">
-                        <StackPanel Orientation="Horizontal">
-                            <!-- Hub: small accent circle badge -->
-                            <Border Width="20" Height="20" CornerRadius="10"
-                                    Background="{StaticResource Accent}"
-                                    Margin="0,0,7,0" VerticalAlignment="Center">
-                                <TextBlock Text="H" FontSize="10" FontWeight="Bold"
-                                           Foreground="White"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"/>
-                            </Border>
-                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold"
-                                       VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </HierarchicalDataTemplate>
-
-                    <HierarchicalDataTemplate DataType="{x:Type vm:ProjectNode}"
-                                              ItemsSource="{Binding Folders}">
-                        <StackPanel Orientation="Horizontal">
-                            <!-- Project: Segoe MDL2 folder icon, accent tinted -->
-                            <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8B7;"
-                                       FontSize="14" Foreground="{StaticResource Accent}"
-                                       Margin="0,0,7,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </HierarchicalDataTemplate>
-
                     <HierarchicalDataTemplate DataType="{x:Type vm:FolderNode}"
                                               ItemsSource="{Binding Children}">
                         <StackPanel Orientation="Horizontal">
-                            <!-- Folder: same icon, muted color -->
                             <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8B7;"
-                                       FontSize="13" Foreground="{StaticResource TextMuted}"
+                                       FontSize="13" Foreground="{StaticResource Accent}"
                                        Margin="0,0,7,0" VerticalAlignment="Center"/>
                             <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
                         </StackPanel>
                     </HierarchicalDataTemplate>
-
                 </TreeView.Resources>
             </TreeView>
 
             <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center"
                           VerticalAlignment="Stretch" Background="{StaticResource Border}"/>
 
-            <!-- Right column: toolbar + file grid + splitter + version history -->
+            <!-- Right: toolbar + content grid + splitter + version history -->
             <Grid Grid.Column="2" Margin="8,0,0,0">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -211,19 +185,62 @@
                     <RowDefinition Height="*" MinHeight="100"/>
                 </Grid.RowDefinitions>
 
-                <!-- File list toolbar -->
-                <Grid Grid.Row="0" Margin="0,0,0,4">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" FontWeight="SemiBold" VerticalAlignment="Center"
-                               Text="{Binding SelectedFolderName,
-                                      TargetNullValue='Files', FallbackValue='Files'}"/>
-                    <Button Grid.Column="1" Content="Check naming" Width="110"
-                            Style="{StaticResource SecondaryBtn}"
-                            Command="{Binding CheckNamingCommand}"/>
-                </Grid>
+                <!-- Breadcrumb: "Project Files > 02 Shared > Subdir"
+                     Separator is inside the ListBoxItem ControlTemplate so a plain
+                     Trigger on (ItemsControl.AlternationIndex) collapses it for item 0.
+                     TextBlock + MouseBinding used instead of Button to avoid dark-theme
+                     template overriding the Foreground. -->
+                <ListBox Grid.Row="0" ItemsSource="{Binding NavigationPath}"
+                         AlternationCount="1000" Margin="0,0,0,4"
+                         Background="Transparent" BorderThickness="0" Focusable="False"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                    <ListBox.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center"/>
+                        </ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Padding"   Value="0"/>
+                            <Setter Property="Margin"    Value="0"/>
+                            <Setter Property="Focusable" Value="False"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <TextBlock x:Name="Sep" Text=" &gt; "
+                                                       VerticalAlignment="Center" FontSize="12"
+                                                       Foreground="{StaticResource TextMuted}"/>
+                                            <ContentPresenter VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="ItemsControl.AlternationIndex" Value="0">
+                                                <Setter TargetName="Sep" Property="Visibility" Value="Collapsed"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:FolderNode}">
+                            <TextBlock Text="{Binding Name}"
+                                       FontWeight="SemiBold" FontSize="13"
+                                       Foreground="{StaticResource TextPri}"
+                                       VerticalAlignment="Center"
+                                       Cursor="Hand">
+                                <TextBlock.InputBindings>
+                                    <MouseBinding MouseAction="LeftClick"
+                                                  Command="{Binding DataContext.NavigateToPathEntryCommand,
+                                                            RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                  CommandParameter="{Binding}"/>
+                                </TextBlock.InputBindings>
+                            </TextBlock>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
 
                 <!-- Status + naming violations -->
                 <StackPanel Grid.Row="1" Margin="0,0,0,4">
@@ -241,8 +258,7 @@
                             <DataTemplate>
                                 <TextBlock TextWrapping="Wrap" Foreground="#E08A7A"
                                            Margin="0,1,0,1">
-                                    <Run Text="{Binding FileName, Mode=OneWay}"
-                                         FontWeight="SemiBold"/>
+                                    <Run Text="{Binding FileName, Mode=OneWay}" FontWeight="SemiBold"/>
                                     <Run Text=" - "/>
                                     <Run Text="{Binding Message, Mode=OneWay}"/>
                                 </TextBlock>
@@ -251,7 +267,7 @@
                     </ItemsControl>
                 </StackPanel>
 
-                <!-- File grid -->
+                <!-- Content grid: folders (top) then files -->
                 <DataGrid Grid.Row="2" x:Name="FileGrid"
                           ItemsSource="{Binding Files}"
                           SelectedItem="{Binding SelectedFile}"
@@ -259,21 +275,42 @@
                           CanUserAddRows="False" SelectionMode="Single"
                           GridLinesVisibility="Horizontal"
                           HeadersVisibility="Column"
-                          PreviewMouseRightButtonDown="OnFileGridRightClick">
+                          PreviewMouseRightButtonDown="OnFileGridRightClick"
+                          MouseDoubleClick="OnFileGridDoubleClick">
                     <DataGrid.ContextMenu>
                         <ContextMenu DataContext="{Binding PlacementTarget.DataContext,
                                                   RelativeSource={RelativeSource Self}}">
                             <MenuItem Header="Convert file..."
                                       Command="{Binding OpenConverterCommand}"/>
+                            <MenuItem Header="Check naming"
+                                      Command="{Binding CheckNamingCommand}"/>
                         </ContextMenu>
                     </DataGrid.ContextMenu>
                     <DataGrid.Columns>
 
-                        <!-- Name: file-type badge + filename -->
+                        <!-- Name: folder icon OR file-type badge + name -->
                         <DataGridTemplateColumn Header="Name" Width="2*" SortMemberPath="Name">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal" Margin="4,0">
+
+                                        <!-- Folder icon (Segoe MDL2 folder glyph) -->
+                                        <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8B7;"
+                                                   FontSize="14" Foreground="{StaticResource Accent}"
+                                                   Margin="0,0,7,0" VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsFolder}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+
+                                        <!-- File-type badge (hidden for folders) -->
                                         <Border Width="34" Height="20" CornerRadius="3"
                                                 Background="#2E5E8E"
                                                 Margin="0,0,8,0" VerticalAlignment="Center">
@@ -282,7 +319,17 @@
                                                        Foreground="White"
                                                        HorizontalAlignment="Center"
                                                        VerticalAlignment="Center"/>
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsFolder}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
                                         </Border>
+
                                         <TextBlock Text="{Binding Name}"
                                                    VerticalAlignment="Center"
                                                    TextTrimming="CharacterEllipsis"/>
@@ -291,7 +338,7 @@
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
 
-                        <!-- Version: rounded pill badge (accent border + text) -->
+                        <!-- Version pill (empty for folders) -->
                         <DataGridTemplateColumn Header="Version" Width="76"
                                                 SortMemberPath="Version">
                             <DataGridTemplateColumn.CellTemplate>
@@ -323,7 +370,7 @@
                               VerticalAlignment="Center" Margin="0,4"
                               Background="{StaticResource Border}"/>
 
-                <!-- Version history -->
+                <!-- Version history panel -->
                 <Grid Grid.Row="4">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>

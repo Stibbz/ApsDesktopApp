@@ -40,51 +40,60 @@
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>   <!-- header + pickers -->
+            <RowDefinition Height="Auto"/>   <!-- header + project picker -->
             <RowDefinition Height="Auto"/>   <!-- search + load -->
             <RowDefinition Height="Auto"/>   <!-- progress -->
             <RowDefinition Height="*"/>      <!-- grid -->
             <RowDefinition Height="Auto"/>   <!-- export / import -->
         </Grid.RowDefinitions>
 
-        <!-- ── Header + Project Picker ────────────────────────────────── -->
-        <StackPanel Grid.Row="0" Margin="0,0,0,12">
-            <TextBlock Text="Issues Manager" FontSize="18" FontWeight="SemiBold"
-                       Margin="0,0,0,2"/>
-            <TextBlock Style="{StaticResource CaptionText}" TextWrapping="Wrap"
-                       Margin="0,0,0,12"
-                       Text="Load all issues from an ACC project. Search and sort the table, then export to Excel for bulk editing. Import the workbook to push changes back."/>
+        <!-- Header: title+description left, Logs button top-right -->
+        <Grid Grid.Row="0" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
 
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="200"/>
-                    <ColumnDefinition Width="16"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="200"/>
-                </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0">
+                <TextBlock Text="Issues Manager" FontSize="18" FontWeight="SemiBold"
+                           Margin="0,0,0,2"/>
+                <TextBlock Style="{StaticResource CaptionText}" TextWrapping="Wrap"
+                           Margin="0,0,0,12"
+                           Text="Load all issues from an ACC project. Search and sort the table, then export to Excel for bulk editing. Import the workbook to push changes back."/>
 
-                <TextBlock Grid.Column="0" Text="Hub" VerticalAlignment="Center"
-                           FontWeight="SemiBold" Margin="0,0,8,0"/>
-                <ComboBox  Grid.Column="1"
-                           ItemsSource="{Binding Hubs}"
-                           SelectedItem="{Binding SelectedHub}"
-                           DisplayMemberPath="Name"
-                           Height="28"
-                           IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}"/>
+                <!-- Unified project picker (single ComboBox, persists across tools) -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="260"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
 
-                <TextBlock Grid.Column="3" Text="Project" VerticalAlignment="Center"
-                           FontWeight="SemiBold" Margin="0,0,8,0"/>
-                <ComboBox  Grid.Column="4"
-                           ItemsSource="{Binding Projects}"
-                           SelectedItem="{Binding SelectedProject}"
-                           DisplayMemberPath="Name"
-                           Height="28"
-                           IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}"/>
-            </Grid>
-        </StackPanel>
+                    <TextBlock Grid.Column="0" Text="Project" VerticalAlignment="Center"
+                               FontWeight="SemiBold" Margin="0,0,8,0"/>
+                    <ComboBox  Grid.Column="1"
+                               ItemsSource="{Binding ProjectContext.AllProjects}"
+                               SelectedItem="{Binding ProjectContext.SelectedProject}"
+                               DisplayMemberPath="DisplayName"
+                               Height="28"
+                               IsEnabled="{Binding ProjectContext.IsLoading,
+                                           Converter={StaticResource InverseBool}}"/>
+                    <!-- Spinner while projects are loading -->
+                    <TextBlock Grid.Column="2" Margin="10,0,0,0"
+                               Style="{StaticResource CaptionText}" VerticalAlignment="Center"
+                               Text="Loading projects..."
+                               Visibility="{Binding ProjectContext.IsLoading,
+                                            Converter={StaticResource BoolToVisibility}}"/>
+                </Grid>
+            </StackPanel>
 
-        <!-- ── Search + Load ───────────────────────────────────────────── -->
+            <Button Grid.Column="1" Content="Logs" Width="56" Height="28"
+                    VerticalAlignment="Top"
+                    ToolTip="View application log"
+                    Click="ShowLogs_Click"/>
+        </Grid>
+
+        <!-- Search + Load -->
         <Grid Grid.Row="1" Margin="0,0,0,10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
@@ -123,7 +132,7 @@
                     Command="{Binding LoadCommand}"/>
         </Grid>
 
-        <!-- ── Progress bar ────────────────────────────────────────────── -->
+        <!-- Progress bar -->
         <Grid Grid.Row="2" Margin="0,0,0,8"
               Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}">
             <Grid.ColumnDefinitions>
@@ -144,7 +153,7 @@
             </TextBlock>
         </Grid>
 
-        <!-- ── Issues DataGrid ─────────────────────────────────────────── -->
+        <!-- Issues DataGrid -->
         <DataGrid Grid.Row="3"
                   ItemsSource="{Binding IssuesView}"
                   AutoGenerateColumns="False"
@@ -181,7 +190,7 @@
             </DataGrid.Columns>
         </DataGrid>
 
-        <!-- ── Export / Import + status ────────────────────────────────── -->
+        <!-- Export / Import + status -->
         <Grid Grid.Row="4">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>

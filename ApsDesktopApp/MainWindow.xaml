@@ -27,23 +27,69 @@
 
     <DockPanel>
 
-        <!-- Menu -->
-        <Menu DockPanel.Dock="Top">
-            <MenuItem Header="_File">
-                <MenuItem Header="E_xit" Click="Exit_Click" />
-            </MenuItem>
-            <MenuItem Header="_APS">
-                <MenuItem Header="_Connect"
-                          Command="{Binding ConnectCommand}" />
-                <MenuItem Header="_Disconnect"
-                          Command="{Binding DisconnectCommand}" />
-                <Separator />
-                <MenuItem Header="_Settings..." Click="Settings_Click" />
-            </MenuItem>
-            <MenuItem Header="_Help">
-                <MenuItem Header="_About" Click="About_Click" />
-            </MenuItem>
-        </Menu>
+        <!-- Menu bar: File/APS/Help on the left; project picker on the right -->
+        <Grid DockPanel.Dock="Top" Background="{StaticResource Surface}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <Menu Grid.Column="0" Background="Transparent" Foreground="{StaticResource TextPri}">
+                <MenuItem Header="_File">
+                    <MenuItem Header="E_xit" Click="Exit_Click" />
+                </MenuItem>
+                <MenuItem Header="_APS">
+                    <MenuItem Header="_Connect"    Command="{Binding ConnectCommand}" />
+                    <MenuItem Header="_Disconnect" Command="{Binding DisconnectCommand}" />
+                    <Separator />
+                    <MenuItem Header="_Settings..." Click="Settings_Click" />
+                </MenuItem>
+                <MenuItem Header="_Help">
+                    <MenuItem Header="_About" Click="About_Click" />
+                </MenuItem>
+            </Menu>
+
+            <!-- Project picker: visible only when connected and projects are available -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal"
+                        VerticalAlignment="Center" Margin="0,2,8,2"
+                        Visibility="{Binding IsConnected, Converter={StaticResource BoolToVisibility}}">
+
+                <TextBlock Text="Project" VerticalAlignment="Center"
+                           Margin="0,0,8,0" Foreground="{StaticResource TextMuted}"
+                           FontSize="12"/>
+
+                <ComboBox ItemsSource="{Binding ProjectContext.GroupedProjects}"
+                          SelectedItem="{Binding ProjectContext.SelectedProject}"
+                          Width="230" Height="24" FontSize="12"
+                          IsEnabled="{Binding ProjectContext.IsLoading,
+                                      Converter={StaticResource InverseBool}}">
+
+                    <!-- Hub name: bold non-selectable section header -->
+                    <ComboBox.GroupStyle>
+                        <GroupStyle>
+                            <GroupStyle.HeaderTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Name}"
+                                               FontWeight="SemiBold"
+                                               FontSize="11"
+                                               Padding="8,5,8,2"
+                                               Foreground="{StaticResource TextMuted}"
+                                               IsHitTestVisible="False"/>
+                                </DataTemplate>
+                            </GroupStyle.HeaderTemplate>
+                        </GroupStyle>
+                    </ComboBox.GroupStyle>
+
+                    <!-- Project name: indented beneath its hub header -->
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding ProjectName}" Padding="16,1,4,1"/>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+            </StackPanel>
+        </Grid>
 
         <!-- Status bar -->
         <StatusBar DockPanel.Dock="Bottom">

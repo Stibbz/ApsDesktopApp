@@ -21,7 +21,6 @@ public partial class IssuesViewModel : ObservableObject, IToolLifecycle
 {
     private const string Cat = "Issues";
 
-    private readonly ApsDataService    _data;
     private readonly AccIssuesService  _issues;
     private readonly AccMembersService _members;
     private readonly AppLogger         _log;
@@ -34,55 +33,41 @@ public partial class IssuesViewModel : ObservableObject, IToolLifecycle
 
     private string? _loadedProjectId;
 
+    // Shared project context -- also exposed to IssuesView.xaml for binding.
+    public ProjectContextViewModel ProjectContext { get; }
+
     public IssuesViewModel(
-        ApsDataService data,
         AccIssuesService issues,
         AccMembersService members,
+        ProjectContextViewModel projectContext,
         AppLogger log)
     {
-        _data    = data;
-        _issues  = issues;
-        _members = members;
-        _log     = log;
+        _issues        = issues;
+        _members       = members;
+        ProjectContext = projectContext;
+        _log           = log;
 
         IssuesView = CollectionViewSource.GetDefaultView(_allIssues);
         IssuesView.Filter = FilterIssue;
+
+        // Clear the grid whenever the user picks a different project.
+        ProjectContext.PropertyChanged += OnProjectContextChanged;
     }
 
-    // -- Project picker -------------------------------------------------------
-
-    public ObservableCollection<Hub>     Hubs     { get; } = new();
-    public ObservableCollection<Project> Projects { get; } = new();
-
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(LoadCommand))]
-    private Hub? _selectedHub;
-
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(LoadCommand))]
-    private Project? _selectedProject;
-
-    partial void OnSelectedHubChanged(Hub? value)
+    private void OnProjectContextChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        Projects.Clear();
-        SelectedProject = null;
-        if (value is not null)
-            _ = LoadProjectsAsync(value.Id);
-    }
+        if (e.PropertyName != nameof(ProjectContextViewModel.SelectedProject)) return;
 
-    private async Task LoadProjectsAsync(string hubId)
-    {
-        try
-        {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-            var projects = await _data.GetProjectsAsync(hubId, cts.Token);
-            foreach (var p in projects)
-                Projects.Add(p);
-        }
-        catch (Exception ex)
-        {
-            _log.Warn(Cat, $"Failed to load projects: {ex.Message}");
-        }
+        _allIssues.Clear();
+        _idToName        = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        _nameToId        = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        _loadedProjectId = null;
+        SearchText       = string.Empty;
+        Status           = string.Empty;
+        OnPropertyChanged(nameof(IssueCount));
+        LoadCommand.NotifyCanExecuteChanged();
+        ExportCommand.NotifyCanExecuteChanged();
+        ImportCommand.NotifyCanExecuteChanged();
     }
 
     // -- Table / search -------------------------------------------------------
@@ -121,12 +106,13 @@ public partial class IssuesViewModel : ObservableObject, IToolLifecycle
 
     public int IssueCount => _allIssues.Count;
 
-    private bool CanLoad() => !IsBusy && SelectedProject is not null;
+    private bool CanLoad() => !IsBusy && ProjectContext.SelectedProject is not null;
 
     [RelayCommand(CanExecute = nameof(CanLoad))]
     private async Task LoadAsync()
     {
-        if (SelectedProject is null) return;
+        var project = ProjectContext.SelectedProject;
+        if (project is null) return;
 
         IsBusy           = true;
         IsLoading        = true;
@@ -136,9 +122,9 @@ public partial class IssuesViewModel : ObservableObject, IToolLifecycle
         _allIssues.Clear();
         _idToName        = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         _nameToId        = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        _loadedProjectId = SelectedProject.Id;
+        _loadedProjectId = project.ProjectId;
 
-        _log.Info(Cat, $"Loading issues for {SelectedProject.Name}");
+        _log.Info(Cat, $"Loading issues for {project.ProjectName}");
 
         var progress = new Progress<(int loaded, int total)>(p =>
         {
@@ -151,8 +137,8 @@ public partial class IssuesViewModel : ObservableObject, IToolLifecycle
             using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
 
             // Load issues and members concurrently.
-            var issuesTask  = _issues.GetAllIssuesAsync(SelectedProject.Id, progress, cts.Token);
-            var membersTask = _members.GetMemberLookupAsync(SelectedProject.Id, cts.Token);
+            var issuesTask  = _issues.GetAllIssuesAsync(project.ProjectId, progress, cts.Token);
+            var membersTask = _members.GetMemberLookupAsync(project.ProjectId, cts.Token);
             await Task.WhenAll(issuesTask, membersTask);
 
             _idToName = membersTask.Result;
@@ -263,8 +249,6 @@ public partial class IssuesViewModel : ObservableObject, IToolLifecycle
         }
 
         // Set "yyyy-mm-dd" display format for the date columns on the data range.
-        // This ensures Excel shows dates in the same format regardless of locale,
-        // and that new dates the user types in column 10 are formatted consistently.
         if (row > 2)
         {
             foreach (int col in new[] { 9, 10, 11 })
@@ -312,6 +296,8 @@ public partial class IssuesViewModel : ObservableObject, IToolLifecycle
         // Capture the lookups for use on the thread pool.
         var nameToId = new Dictionary<string, string>(_nameToId, StringComparer.OrdinalIgnoreCase);
 
+        int ok = 0, failed = 0;
+        bool anyUpdated = false;
         try
         {
             var patches = await Task.Run(() => ReadExcelPatches(dialog.FileName, nameToId));
@@ -321,7 +307,6 @@ public partial class IssuesViewModel : ObservableObject, IToolLifecycle
                 return;
             }
 
-            int ok = 0, failed = 0;
             using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
 
             foreach (var (issueId, body) in patches)
@@ -340,10 +325,11 @@ public partial class IssuesViewModel : ObservableObject, IToolLifecycle
                 await Task.Delay(150, cts.Token);
             }
 
+            anyUpdated = ok > 0;
             _log.Info(Cat, $"Import done: {ok} updated, {failed} failed");
             Status = failed == 0
-                ? $"Import complete: {ok} issue(s) updated."
-                : $"Import finished: {ok} updated, {failed} failed (see logs).";
+                ? $"Import complete: {ok} issue(s) updated. Refreshing..."
+                : $"Import finished: {ok} updated, {failed} failed (see logs). Refreshing...";
         }
         catch (Exception ex)
         {
@@ -354,6 +340,10 @@ public partial class IssuesViewModel : ObservableObject, IToolLifecycle
         {
             IsBusy = false;
         }
+
+        // Refresh the grid so the user can see the changes they just wrote back.
+        if (anyUpdated)
+            await LoadAsync();
     }
 
     private static List<(string issueId, Dictionary<string, object?> body)> ReadExcelPatches(
@@ -417,7 +407,10 @@ public partial class IssuesViewModel : ObservableObject, IToolLifecycle
             body["status"] = status;
 
         if (!string.IsNullOrWhiteSpace(assignedTo))
-            body["assignedTo"] = nameToId.TryGetValue(assignedTo, out var uid) ? uid : assignedTo;
+        {
+            body["assignedTo"]     = nameToId.TryGetValue(assignedTo, out var uid) ? uid : assignedTo;
+            body["assignedToType"] = "user";
+        }
 
         if (!string.IsNullOrWhiteSpace(owner))
             body["ownerId"] = nameToId.TryGetValue(owner, out var oid) ? oid : owner;
@@ -433,18 +426,10 @@ public partial class IssuesViewModel : ObservableObject, IToolLifecycle
 
     // -- Lifecycle ------------------------------------------------------------
 
-    public async Task ActivateAsync()
-    {
-        if (Hubs.Count == 0)
-            await LoadHubsAsync();
-    }
+    public Task ActivateAsync() => Task.CompletedTask;
 
     public void Reset()
     {
-        Hubs.Clear();
-        Projects.Clear();
-        SelectedHub      = null;
-        SelectedProject  = null;
         _allIssues.Clear();
         _idToName        = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         _nameToId        = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -454,22 +439,6 @@ public partial class IssuesViewModel : ObservableObject, IToolLifecycle
         LoadedCount      = 0;
         TotalCount       = 0;
         OnPropertyChanged(nameof(IssueCount));
-    }
-
-    private async Task LoadHubsAsync()
-    {
-        try
-        {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-            var hubs = await _data.GetHubsAsync(cts.Token);
-            foreach (var h in hubs)
-                Hubs.Add(h);
-        }
-        catch (Exception ex)
-        {
-            _log.Warn(Cat, $"Failed to load hubs: {ex.Message}");
-            Status = $"Could not load hubs: {ex.Message}";
-        }
     }
 }
 

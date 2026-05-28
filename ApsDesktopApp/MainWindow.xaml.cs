@@ -1,4 +1,7 @@
+using System;
+using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Interop;
 using ApsDesktopApp.Services;
 using ApsDesktopApp.ViewModels;
 
@@ -19,7 +22,23 @@ public partial class MainWindow : Window
         _twoLegged = twoLegged;
 
         _viewModel.ConfigurationRequested += OnConfigurationRequested;
+
+        // Apply dark title bar once the HWND exists.
+        SourceInitialized += (_, _) => ApplyDarkTitleBar();
     }
+
+    // Tells DWM to use the dark (immersive) caption colour.
+    // Attribute 20 = DWMWA_USE_IMMERSIVE_DARK_MODE (Windows 10 1903+, Windows 11).
+    private void ApplyDarkTitleBar()
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        int value = 1;
+        DwmSetWindowAttribute(hwnd, 20, ref value, Marshal.SizeOf(value));
+    }
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(
+        IntPtr hwnd, int attr, ref int attrValue, int attrSize);
 
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
@@ -37,7 +56,7 @@ public partial class MainWindow : Window
         return false;
     }
 
-    private void OnConfigurationRequested(object? sender, System.EventArgs e)
+    private void OnConfigurationRequested(object? sender, EventArgs e)
     {
         if (OpenSettings() && _auth.IsConfigured)
             Dispatcher.BeginInvoke(() =>

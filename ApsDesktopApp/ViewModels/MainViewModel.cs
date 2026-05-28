@@ -29,12 +29,17 @@ public partial class MainViewModel : ObservableObject
     // The View handles this by opening the Settings window (no MessageBox).
     public event EventHandler? ConfigurationRequested;
 
+    // Shared project selection used by all tools that operate on a single project.
+    public ProjectContextViewModel ProjectContext { get; }
+
     public MainViewModel(
         ApsAuthService auth,
         ApsDataService data,
+        ProjectContextViewModel projectContext,
         DataBrowserViewModel dataBrowser,
         IssuesViewModel issues)
     {
+        ProjectContext = projectContext;
         _auth = auth;
         _data = data;
 
@@ -126,6 +131,7 @@ public partial class MainViewModel : ObservableObject
             await LoadProfileAsync(cts.Token);
             State = ConnectionState.Connected;
             CurrentTool = null; // land on the home page
+            _ = ProjectContext.LoadAsync();
         }
         catch (Exception ex)
         {
@@ -140,6 +146,7 @@ public partial class MainViewModel : ObservableObject
         _auth.SignOut();
         UserDisplayName = string.Empty;
         CurrentTool = null;
+        ProjectContext.Reset();
         foreach (var tool in Tools)
             (tool.ViewModel as IToolLifecycle)?.Reset();
         State = ConnectionState.Disconnected;
@@ -155,6 +162,7 @@ public partial class MainViewModel : ObservableObject
             {
                 State = ConnectionState.Connected;
                 CurrentTool = null;
+                _ = ProjectContext.LoadAsync();
             }
         }
         catch

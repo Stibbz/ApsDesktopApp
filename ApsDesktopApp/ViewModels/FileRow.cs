@@ -2,10 +2,12 @@ using ApsDesktopApp.Models;
 
 namespace ApsDesktopApp.ViewModels;
 
-// One row in the file details grid. Projects a FileEntry's raw values into the
-// display strings the DataGrid binds to (formatted size, version, local time).
+// One row in the file details / folder-contents grid.
+// Either a regular file (IsFolder = false) or a subdirectory (IsFolder = true).
 public class FileRow
 {
+    // -- File constructor -----------------------------------------------------
+
     public FileRow(FileEntry entry, string projectId)
     {
         ItemId = entry.ItemId;
@@ -20,21 +22,35 @@ public class FileRow
         TipVersionUrn = entry.TipVersionUrn;
     }
 
-    // Identifiers carried so the metadata inspector can fetch version history.
-    public string ItemId { get; }
-    public string ProjectId { get; }
-    // URN of the tip (latest) version -- passed directly to Model Derivative.
-    public string TipVersionUrn { get; }
+    // -- Folder constructor ---------------------------------------------------
 
-    public string Name { get; }
-    public string FileType { get; }
-    public string Version { get; }
-    public string Size { get; }
-    public string LastModified { get; }
-    public string ModifiedBy { get; }
+    public FileRow(FolderEntry entry, string projectId)
+    {
+        IsFolder = true;
+        FolderId = entry.Id;
+        ProjectId = projectId;
+        Name = entry.Name;
+        // File-specific fields stay at their defaults (empty / zero)
+    }
 
-    // Human-readable byte size: scales through B/KB/MB/GB/TB, one decimal place
-    // above KB (e.g. "12.3 MB"), whole bytes below 1 KB.
+    // True when this row represents a subdirectory rather than a file.
+    // Folder rows don't carry version/size/modification metadata.
+    public bool IsFolder { get; }
+
+    // Identifiers: one of FolderId or ItemId is populated depending on IsFolder.
+    public string FolderId   { get; } = string.Empty;
+    public string ItemId     { get; } = string.Empty;
+    public string ProjectId  { get; } = string.Empty;
+    public string TipVersionUrn { get; } = string.Empty;
+
+    public string Name         { get; } = string.Empty;
+    public string FileType     { get; } = string.Empty;
+    public string Version      { get; } = string.Empty;
+    public string Size         { get; } = string.Empty;
+    public string LastModified { get; } = string.Empty;
+    public string ModifiedBy   { get; } = string.Empty;
+
+    // Human-readable byte size (B / KB / MB / GB / TB).
     public static string FormatSize(long bytes)
     {
         if (bytes <= 0)

@@ -8,12 +8,12 @@ namespace ApsDesktopApp.Views;
 
 public partial class DataBrowserView : UserControl
 {
+    private LogViewerWindow? _logWindow;
+
     public DataBrowserView()
     {
         InitializeComponent();
 
-        // TreeView SelectedItem is read-only (not bindable), and per-node expand
-        // needs the container event, so we bridge both to the ViewModel here.
         BrowserTree.AddHandler(TreeViewItem.ExpandedEvent,
             new RoutedEventHandler(OnTreeItemExpanded));
 
@@ -30,7 +30,6 @@ public partial class DataBrowserView : UserControl
             vm.ConvertFileRequested += OnConvertFileRequested;
     }
 
-    // Opens the convert dialog with the selected file pre-filled.
     private void OnConvertFileRequested()
     {
         if (ViewModel is null) return;
@@ -42,32 +41,33 @@ public partial class DataBrowserView : UserControl
         dialog.ShowDialog();
     }
 
-    // Lazy-load children the first time a project or folder is expanded.
+    // Lazy-load subfolders the first time a folder node is expanded in the tree.
     private async void OnTreeItemExpanded(object sender, RoutedEventArgs e)
     {
         if (ViewModel is null || e.OriginalSource is not TreeViewItem item)
             return;
 
-        switch (item.DataContext)
-        {
-            case ProjectNode project:
-                await ViewModel.LoadTopFoldersAsync(project);
-                break;
-            case FolderNode folder when !folder.IsPlaceholder:
-                await ViewModel.LoadSubFoldersAsync(folder);
-                break;
-        }
+        if (item.DataContext is FolderNode folder && !folder.IsPlaceholder)
+            await ViewModel.LoadSubFoldersAsync(folder);
     }
 
-    // Selecting a folder loads its files into the details grid.
-    private async void OnTreeSelectionChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+    // Selecting a folder in the tree loads its contents in the right panel.
+    private async void OnTreeSelectionChanged(
+        object sender, RoutedPropertyChangedEventArgs<object> e)
     {
         if (ViewModel is not null && e.NewValue is FolderNode folder && !folder.IsPlaceholder)
-            await ViewModel.ShowFolderFilesAsync(folder);
+            await ViewModel.ShowFolderContentsAsync(folder);
     }
 
-    // Right-clicking a row selects it (WPF DataGrid doesn't do this by default),
-    // so the context menu always reflects the row the user clicked on.
+    // Double-clicking a folder row in the content grid navigates into it.
+    private async void OnFileGridDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (ViewModel?.SelectedFile is { IsFolder: true } row)
+            await ViewModel.NavigateIntoFolderAsync(row);
+    }
+
+    // Right-clicking a file row selects it so the context menu always reflects
+    // the clicked row (WPF DataGrid doesn't do this by default).
     private void OnFileGridRightClick(object sender, MouseButtonEventArgs e)
     {
         var hit = e.OriginalSource as DependencyObject;
@@ -76,5 +76,19 @@ public partial class DataBrowserView : UserControl
 
         if (hit is DataGridRow row)
             row.IsSelected = true;
+    }
+
+    private void ShowLogs_Click(object sender, RoutedEventArgs e)
+    {
+        if (_logWindow is null)
+        {
+            _logWindow = new LogViewerWindow
+            {
+                Owner = Window.GetWindow(this)
+            };
+            _logWindow.Closed += (_, _) => _logWindow = null;
+        }
+        _logWindow.Show();
+        _logWindow.Activate();
     }
 }

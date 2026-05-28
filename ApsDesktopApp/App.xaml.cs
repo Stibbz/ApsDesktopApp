@@ -88,6 +88,7 @@ public partial class App : Application
         services.AddSingleton<Services.Naming.NamingRuleEngine>();
 
         // Tools (one ViewModel each) + the shell that hosts them.
+        services.AddSingleton<ProjectContextViewModel>();
         services.AddSingleton<DataBrowserViewModel>();
         services.AddSingleton<FileConverterViewModel>();
         services.AddSingleton<IssuesViewModel>();

@@ -19,6 +19,9 @@ public class AppSettings
     // own API default is "US" (also valid: "APAC").
     public string Region { get; set; } = "EMEA";
 
+    // Last project selected in the unified project picker - restored on next session.
+    public string LastProjectId { get; set; } = string.Empty;
+
     public string RedirectUri => $"http://localhost:{CallbackPort}/callback";
 
     public static AppSettings Load()
