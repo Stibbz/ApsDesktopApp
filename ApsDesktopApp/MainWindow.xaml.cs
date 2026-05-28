@@ -8,13 +8,15 @@ public partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
     private readonly ApsAuthService _auth;
+    private readonly TwoLeggedTokenService _twoLegged;
 
-    public MainWindow(MainViewModel viewModel, ApsAuthService auth)
+    public MainWindow(MainViewModel viewModel, ApsAuthService auth, TwoLeggedTokenService twoLegged)
     {
         InitializeComponent();
         DataContext = viewModel;
         _viewModel = viewModel;
         _auth = auth;
+        _twoLegged = twoLegged;
 
         _viewModel.ConfigurationRequested += OnConfigurationRequested;
     }
@@ -29,6 +31,7 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog() == true)
         {
             _auth.ReloadSettings();
+            _twoLegged.ReloadSettings();
             return true;
         }
         return false;

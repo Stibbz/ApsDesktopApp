@@ -33,19 +33,35 @@ public partial class App : Application
 
         var services = new ServiceCollection();
 
+        services.AddSingleton<AppLogger>();
+
         // Plain HttpClient for the unauthenticated token endpoints; ApsAuthService
         // resolves this one (no ApsAuthHandler, so the refresh call can't recurse).
+        // Plain HttpClient shared by unauthenticated token endpoints (3-legged
+        // exchange/refresh and 2-legged client credentials). Must not carry any
+        // auth handler or refresh calls would recurse.
         services.AddSingleton<HttpClient>();
         services.AddSingleton<TokenStorage>();
         services.AddSingleton<ApsAuthService>();
         services.AddSingleton<ApsAuthHandler>();
 
-        // Keyed "data" HttpClient: wrapped with ApsAuthHandler (injects bearer,
-        // retries on 401). Shared by every authenticated service. The handler
-        // resolves ApsAuthService lazily, so this is not a construction cycle.
+        // Keyed "data" HttpClient: 3-legged bearer via ApsAuthHandler.
         services.AddKeyedSingleton<HttpClient>("data", (sp, _) =>
         {
             var handler = sp.GetRequiredService<ApsAuthHandler>();
+            handler.InnerHandler = new HttpClientHandler();
+            return new HttpClient(handler);
+        });
+
+        // Keyed "modelderivative" HttpClient: 2-legged bearer via TwoLeggedAuthHandler.
+        services.AddSingleton<SecretStorage>();
+        services.AddSingleton<TwoLeggedTokenService>(sp => new TwoLeggedTokenService(
+            sp.GetRequiredService<HttpClient>(),
+            sp.GetRequiredService<SecretStorage>()));
+        services.AddSingleton<TwoLeggedAuthHandler>();
+        services.AddKeyedSingleton<HttpClient>("modelderivative", (sp, _) =>
+        {
+            var handler = sp.GetRequiredService<TwoLeggedAuthHandler>();
             handler.InnerHandler = new HttpClientHandler();
             return new HttpClient(handler);
         });
@@ -54,7 +70,8 @@ public partial class App : Application
             sp.GetRequiredKeyedService<HttpClient>("data"),
             sp.GetRequiredService<ApsAuthService>()));
         services.AddSingleton<ModelDerivativeService>(sp => new ModelDerivativeService(
-            sp.GetRequiredKeyedService<HttpClient>("data")));
+            sp.GetRequiredKeyedService<HttpClient>("modelderivative"),
+            sp.GetRequiredService<AppLogger>()));
 
         // Naming-convention rules: register each INamingRule; the engine receives
         // them all via IEnumerable<INamingRule>. Add more rules by registering
@@ -64,7 +81,6 @@ public partial class App : Application
 
         // Tools (one ViewModel each) + the shell that hosts them.
         services.AddSingleton<DataBrowserViewModel>();
-        services.AddSingleton<ModelDerivativeViewModel>();
         services.AddSingleton<FileConverterViewModel>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainWindow>();
