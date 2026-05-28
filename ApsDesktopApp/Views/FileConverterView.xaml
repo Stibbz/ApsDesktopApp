@@ -11,66 +11,86 @@
                    Margin="0,0,0,4"/>
         <TextBlock Style="{StaticResource CaptionText}" TextWrapping="Wrap"
                    Margin="0,0,0,24"
-                   Text="Convert a file stored in ACC to a different format without needing any desktop software. Paste the version link from the Data Browser, choose an output format, and click Convert. When the conversion is ready, click Download to save the file." />
+                   Text="Convert a file stored in ACC to a different format without needing any desktop software. Right-click a file in the Data Browser and choose Convert, then pick an output format and click Convert." />
 
-        <!-- Step 1: version link -->
-        <TextBlock Text="1. Version link" FontWeight="SemiBold" Margin="0,0,0,4"/>
+        <!-- Output format -->
+        <TextBlock Text="Output format" FontWeight="SemiBold" Margin="0,0,0,4"/>
         <TextBlock Style="{StaticResource CaptionText}" TextWrapping="Wrap"
                    Margin="0,0,0,6"
-                   Text="Open the Data Browser, select a file version, and copy its link from the version history panel." />
-        <TextBox Style="{StaticResource SettingInput}"
-                 Margin="0,0,0,20"
-                 Text="{Binding VersionUrn, UpdateSourceTrigger=PropertyChanged}"
-                 IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}" />
-
-        <!-- Step 2: output format -->
-        <TextBlock Text="2. Output format" FontWeight="SemiBold" Margin="0,0,0,4"/>
-        <TextBlock Style="{StaticResource CaptionText}" TextWrapping="Wrap"
-                   Margin="0,0,0,6"
-                   Text="Choose the format you want to receive. Not all formats work for every file type -- if conversion fails, the format may not be supported for that input." />
+                   Text="Not all formats work for every file type -- if conversion fails, the format may not be supported for that input." />
         <ComboBox ItemsSource="{Binding OutputFormats}"
                   SelectedItem="{Binding SelectedFormat}"
                   DisplayMemberPath="DisplayName"
                   Height="32" Margin="0,0,0,20"
-                  Background="{StaticResource Surface}"
-                  Foreground="{StaticResource TextPri}"
-                  BorderBrush="{StaticResource Border}"
                   IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}" />
 
-        <!-- Action buttons -->
-        <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-            <Button Content="Convert" Width="100" Margin="0,0,8,0"
+        <!-- Action row: Convert left | spinner + Download right -->
+        <Grid Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Button Grid.Column="0" Content="Convert" Width="100"
                     Style="{StaticResource PrimaryBtn}"
                     Command="{Binding ConvertCommand}" />
-            <Button Content="Check status" Width="110"
-                    Style="{StaticResource SecondaryBtn}"
-                    Command="{Binding CheckStatusCommand}" />
-        </StackPanel>
 
-        <!-- Status text -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal"
+                        HorizontalAlignment="Right" VerticalAlignment="Center">
+
+                <!-- Spinning arc: Hidden (not Collapsed) so Download does not shift. -->
+                <Path Width="24" Height="24" Margin="0,0,8,0"
+                      VerticalAlignment="Center"
+                      Stroke="{StaticResource Accent}" StrokeThickness="3"
+                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                      Data="M 12,4 A 8,8 0 1 1 4,12"
+                      Stretch="None">
+                    <Path.RenderTransform>
+                        <RotateTransform CenterX="12" CenterY="12"/>
+                    </Path.RenderTransform>
+                    <Path.Style>
+                        <Style TargetType="Path">
+                            <Setter Property="Visibility" Value="Hidden"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsPolling}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsPolling}" Value="True">
+                                    <DataTrigger.EnterActions>
+                                        <BeginStoryboard x:Name="SpinBoard">
+                                            <Storyboard RepeatBehavior="Forever">
+                                                <DoubleAnimation
+                                                    Storyboard.TargetProperty="(Path.RenderTransform).(RotateTransform.Angle)"
+                                                    From="0" To="360" Duration="0:0:1"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </DataTrigger.EnterActions>
+                                    <DataTrigger.ExitActions>
+                                        <StopStoryboard BeginStoryboardName="SpinBoard"/>
+                                    </DataTrigger.ExitActions>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Path.Style>
+                </Path>
+
+                <Button Content="Download" Width="100"
+                        IsEnabled="{Binding IsReadyToDownload}"
+                        Style="{StaticResource PrimaryBtn}"
+                        Command="{Binding DownloadCommand}" />
+
+                <Button Content="Logs" Width="56" Margin="8,0,0,0"
+                        ToolTip="View application log"
+                        Click="ShowLogs_Click"/>
+
+            </StackPanel>
+        </Grid>
+
+        <!-- Error / completion messages only -->
         <TextBlock Style="{StaticResource CaptionText}" TextWrapping="Wrap"
-                   Margin="0,0,0,16"
+                   Foreground="{StaticResource TextPri}"
                    Text="{Binding Status}"
                    Visibility="{Binding Status, Converter={StaticResource StringToVisibility}}" />
-
-        <!-- Download panel: only shown when conversion is complete -->
-        <Border Background="{StaticResource Surface}" CornerRadius="6"
-                Padding="16" Margin="0,0,0,0"
-                Visibility="{Binding IsReadyToDownload,
-                             Converter={StaticResource BoolToVisibility}}">
-            <StackPanel Orientation="Horizontal">
-                <TextBlock VerticalAlignment="Center" Margin="0,0,16,0"
-                           Text="Conversion complete. Save the file to your computer." />
-                <Button Style="{StaticResource PrimaryBtn}"
-                        Command="{Binding DownloadCommand}">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="Download " />
-                        <TextBlock Text="{Binding SelectedFormat.FileExtension}"
-                                   FontWeight="SemiBold" />
-                    </StackPanel>
-                </Button>
-            </StackPanel>
-        </Border>
 
     </StackPanel>
 </UserControl>

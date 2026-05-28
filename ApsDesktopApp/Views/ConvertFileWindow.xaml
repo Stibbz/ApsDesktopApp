@@ -3,91 +3,16 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:views="clr-namespace:ApsDesktopApp.Views"
         mc:Ignorable="d"
         Title="Convert file"
-        Width="460" SizeToContent="Height"
+        Width="620" SizeToContent="Height"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner"
         Background="{StaticResource WindowBg}"
         Foreground="{StaticResource TextPri}"
         FontFamily="Segoe UI" FontSize="13">
 
-    <Grid Margin="24">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+    <views:FileConverterView Margin="24"/>
 
-        <!-- File name header -->
-        <StackPanel Grid.Row="0" Margin="0,0,0,20">
-            <TextBlock Text="Convert file" FontSize="16" FontWeight="SemiBold"
-                       Margin="0,0,0,6"/>
-            <Border Background="{StaticResource Surface}" CornerRadius="4" Padding="10,8">
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock FontFamily="Segoe MDL2 Assets" Text="&#xE8A5;"
-                               FontSize="14" Foreground="{StaticResource Accent}"
-                               Margin="0,0,8,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding FileName}" FontWeight="SemiBold"
-                               TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
-                </StackPanel>
-            </Border>
-        </StackPanel>
-
-        <!-- Output format -->
-        <TextBlock Grid.Row="1" Text="Output format" FontWeight="SemiBold"
-                   Margin="0,0,0,6"/>
-        <ComboBox Grid.Row="2"
-                  ItemsSource="{Binding OutputFormats}"
-                  SelectedItem="{Binding SelectedFormat}"
-                  DisplayMemberPath="DisplayName"
-                  Height="32" Margin="0,0,0,20"
-                  Background="{StaticResource Surface}"
-                  Foreground="{StaticResource TextPri}"
-                  BorderBrush="{StaticResource Border}"
-                  IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}"/>
-
-        <!-- Action buttons -->
-        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,0,0,12">
-            <Button Content="Convert" Width="100" Margin="0,0,8,0"
-                    Style="{StaticResource PrimaryBtn}"
-                    Command="{Binding ConvertCommand}"/>
-            <Button Content="Check status" Width="110"
-                    Style="{StaticResource SecondaryBtn}"
-                    Command="{Binding CheckStatusCommand}"/>
-        </StackPanel>
-
-        <!-- Status -->
-        <TextBlock Grid.Row="4" Style="{StaticResource CaptionText}"
-                   TextWrapping="Wrap" Margin="0,0,0,12"
-                   Text="{Binding Status}"
-                   Visibility="{Binding Status, Converter={StaticResource StringToVisibility}}"/>
-
-        <!-- Download panel -->
-        <Border Grid.Row="5" Background="{StaticResource Surface}" CornerRadius="6"
-                Padding="12" Margin="0,0,0,16"
-                Visibility="{Binding IsReadyToDownload, Converter={StaticResource BoolToVisibility}}">
-            <DockPanel>
-                <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryBtn}"
-                        Padding="12,6" Command="{Binding DownloadCommand}">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="Download "/>
-                        <TextBlock Text="{Binding SelectedFormat.FileExtension}"
-                                   FontWeight="SemiBold"/>
-                    </StackPanel>
-                </Button>
-                <TextBlock Text="Conversion complete." VerticalAlignment="Center"
-                           Margin="0,0,12,0"/>
-            </DockPanel>
-        </Border>
-
-        <!-- Close button -->
-        <Button Grid.Row="6" Content="Close" Width="80" HorizontalAlignment="Right"
-                Style="{StaticResource SecondaryBtn}"
-                Click="Close_Click"/>
-    </Grid>
 </Window>
