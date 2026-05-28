@@ -75,6 +75,13 @@ Grows tool-by-tool; sole user now, intended for colleague distribution later.
   metadata (version, size, modified-by) lives in `included[]` "versions",
   joined via the item's `relationships.tip.data.id`.
 
+## ACC Admin API
+- Project members endpoint: `GET /construction/admin/v1/projects/{projectId}/users` -- **no account ID in the path**.
+  The `/accounts/{accountId}/projects/...` shape does NOT exist and returns 404 silently.
+- Requires `account:read` scope on the 3-legged token. Without it, APS returns 404 (not 401/403) even for Project Admins.
+- Adding a scope to `ApsAuthService.Scopes` takes effect only after the user signs out and back in -- token refresh reuses the old scope set.
+- Ground-truth endpoint URLs: check `github.com/autodesk-platform-services/aps-sdk-net` samples + generated source before assuming a URL from prose docs.
+
 ## Layout
 - `Models/` — DTOs (TokenInfo, UserProfile)
 - `Services/` — auth, PKCE, callback server, token/settings storage

@@ -19,7 +19,7 @@ public class ApsAuthService
     // offline_access is REQUIRED for APS to issue a refresh_token; without it
     // the token response has no refresh_token and EnsureValidAccessTokenAsync
     // can only ever sign out once the 1-hour access token expires.
-    private const string Scopes = "data:read data:write data:create viewables:read offline_access";
+    private const string Scopes = "data:read data:write data:create viewables:read account:read offline_access";
 
     // Plain client for the unauthenticated token endpoints (authorize/exchange/
     // refresh). It must NOT carry ApsAuthHandler: that handler calls back here to
