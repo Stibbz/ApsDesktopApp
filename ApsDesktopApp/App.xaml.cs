@@ -28,6 +28,7 @@ public partial class App : Application
         });
         Resources.Add("BoolToVisibility", new BooleanToVisibilityConverter());
         Resources.Add("InverseBoolToVisibility", new Converters.InverseBoolToVisibilityConverter());
+        Resources.Add("InverseBool", new Converters.InverseBoolConverter());
         Resources.Add("StringToVisibility", new Converters.StringToVisibilityConverter());
 
         var services = new ServiceCollection();
@@ -64,6 +65,7 @@ public partial class App : Application
         // Tools (one ViewModel each) + the shell that hosts them.
         services.AddSingleton<DataBrowserViewModel>();
         services.AddSingleton<ModelDerivativeViewModel>();
+        services.AddSingleton<FileConverterViewModel>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainWindow>();
 

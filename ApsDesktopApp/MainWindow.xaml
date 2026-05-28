@@ -23,6 +23,9 @@
         <DataTemplate DataType="{x:Type vm:ModelDerivativeViewModel}">
             <views:ModelDerivativeView />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:FileConverterViewModel}">
+            <views:FileConverterView />
+        </DataTemplate>
     </Window.Resources>
 
     <DockPanel>

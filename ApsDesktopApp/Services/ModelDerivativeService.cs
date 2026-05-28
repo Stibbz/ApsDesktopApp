@@ -3,15 +3,17 @@ using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using ApsDesktopApp.Models;
 
 namespace ApsDesktopApp.Services;
 
-// Model Derivative: trigger a translation job and poll its manifest. WPF-free.
-// Unlike Data Management, this API IS region-routed -- every request carries the
-// x-ads-region header from AppSettings.Region. Uses the handler-authed client.
+// Wraps the APS Model Derivative v2 API: start a translation job, poll its
+// manifest, and download a converted output file. WPF-free.
+// Unlike Data Management, this API IS region-routed -- every request carries
+// the x-ads-region header sourced from AppSettings. Uses the handler-authed client.
 public class ModelDerivativeService
 {
     private const string Base = "https://developer.api.autodesk.com/modelderivative/v2/designdata";
@@ -27,35 +29,41 @@ public class ModelDerivativeService
 
     public void ReloadSettings() => _settings = AppSettings.Load();
 
-    // Starts an SVF2 translation for the given version URN (raw, not yet
-    // encoded). Returns once APS has accepted the job; poll the manifest for
-    // progress.
-    public async Task StartTranslationAsync(string versionUrn, CancellationToken cancellationToken)
+    // Submits a translation job for the given version URN.
+    // outputFormat is the APS format token: "ifc", "dwg", "obj", "stl", "svf2", etc.
+    // HTTP 409 means a job already exists for this URN/format -- treated as success.
+    public async Task StartTranslationAsync(
+        string versionUrn,
+        string outputFormat,
+        CancellationToken cancellationToken)
     {
-        var body = new
+        var outputNode = outputFormat is "svf" or "svf2"
+            ? new JsonObject { ["type"] = outputFormat, ["views"] = new JsonArray("2d", "3d") }
+            : new JsonObject { ["type"] = outputFormat };
+
+        var body = new JsonObject
         {
-            input = new { urn = ToBase64Url(versionUrn) },
-            output = new
+            ["input"] = new JsonObject { ["urn"] = ToBase64Url(versionUrn) },
+            ["output"] = new JsonObject
             {
-                formats = new[]
-                {
-                    new { type = "svf2", views = new[] { "2d", "3d" } }
-                }
+                ["formats"] = new JsonArray(outputNode)
             }
         };
 
         using var request = new HttpRequestMessage(HttpMethod.Post, $"{Base}/job");
         request.Headers.Add("x-ads-region", RegionHeader());
-        request.Content = new StringContent(
-            JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+        request.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
 
         using var response = await _http.SendAsync(request, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.Conflict)
+            return; // translation already queued or complete
         response.EnsureSuccessStatusCode();
     }
 
-    // Fetches the translation manifest. Returns null if the URN has no manifest
-    // yet (HTTP 404), i.e. no job has been started for it.
-    public async Task<ManifestStatus?> GetManifestAsync(string versionUrn, CancellationToken cancellationToken)
+    // Returns the manifest for the given URN, or null if no job has been started (404).
+    public async Task<ManifestStatus?> GetManifestAsync(
+        string versionUrn,
+        CancellationToken cancellationToken)
     {
         var urn = ToBase64Url(versionUrn);
         using var request = new HttpRequestMessage(HttpMethod.Get, $"{Base}/{urn}/manifest");
@@ -70,12 +78,30 @@ public class ModelDerivativeService
         return JsonSerializer.Deserialize<ManifestStatus>(json);
     }
 
+    // Downloads a specific derivative resource (identified by its child URN from
+    // the manifest) and returns the raw file bytes.
+    public async Task<byte[]> DownloadDerivativeAsync(
+        string versionUrn,
+        string derivativeUrn,
+        CancellationToken cancellationToken)
+    {
+        var urn = ToBase64Url(versionUrn);
+        var encodedDerivative = Uri.EscapeDataString(derivativeUrn);
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get, $"{Base}/{urn}/manifest/{encodedDerivative}");
+        request.Headers.Add("x-ads-region", RegionHeader());
+
+        using var response = await _http.SendAsync(request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsByteArrayAsync(cancellationToken);
+    }
+
     // APS accepts "US", "EMEA", or "APAC"; default to US if unset.
     private string RegionHeader() =>
         string.IsNullOrWhiteSpace(_settings.Region) ? "US" : _settings.Region;
 
     // URL-safe, unpadded Base64 of the URN, as Model Derivative requires.
-    private static string ToBase64Url(string value)
+    public static string ToBase64Url(string value)
     {
         var bytes = Encoding.UTF8.GetBytes(value);
         return Convert.ToBase64String(bytes)

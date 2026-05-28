@@ -49,7 +49,7 @@ public partial class ModelDerivativeViewModel : ObservableObject, IToolLifecycle
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-            await _derivative.StartTranslationAsync(VersionUrn.Trim(), cts.Token);
+            await _derivative.StartTranslationAsync(VersionUrn.Trim(), "svf2", cts.Token);
             Status = "Job accepted. Use \"Check status\" to poll progress.";
         }
         catch (Exception ex)
