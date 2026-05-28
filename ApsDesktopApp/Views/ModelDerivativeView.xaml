@@ -1,0 +1,29 @@
+<UserControl x:Class="ApsDesktopApp.Views.ModelDerivativeView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d">
+    <StackPanel MaxWidth="640" HorizontalAlignment="Left">
+        <TextBlock Text="Model Derivative" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,4" />
+        <TextBlock Style="{StaticResource CaptionText}" TextWrapping="Wrap" Margin="0,0,0,16"
+                   Text="Paste a model version URN (urn:adsk.wipprod:fs.file:vf...?version=N), start an SVF2 translation, then poll the manifest. Requests are routed to the region set in Settings." />
+
+        <TextBlock Text="Version URN" FontWeight="SemiBold" Margin="0,0,0,4" />
+        <TextBox Style="{StaticResource SettingInput}" Margin="0,0,0,12"
+                 Text="{Binding VersionUrn, UpdateSourceTrigger=PropertyChanged}" />
+
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+            <Button Content="Translate" Width="110" Margin="0,0,8,0"
+                    Style="{StaticResource PrimaryBtn}"
+                    Command="{Binding TranslateCommand}" />
+            <Button Content="Check status" Width="110"
+                    Style="{StaticResource SecondaryBtn}"
+                    Command="{Binding CheckStatusCommand}" />
+        </StackPanel>
+
+        <TextBlock Style="{StaticResource CaptionText}" TextWrapping="Wrap"
+                   Text="{Binding Status}"
+                   Visibility="{Binding Status, Converter={StaticResource StringToVisibility}}" />
+    </StackPanel>
+</UserControl>

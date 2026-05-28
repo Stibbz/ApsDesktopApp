@@ -3,15 +3,28 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:ApsDesktopApp"
         xmlns:vm="clr-namespace:ApsDesktopApp.ViewModels"
-        xmlns:models="clr-namespace:ApsDesktopApp.Models"
+        xmlns:views="clr-namespace:ApsDesktopApp.Views"
         mc:Ignorable="d"
-        Title="APS Desktop App" Height="520" Width="860"
+        Title="APS Desktop App" Height="600" Width="960"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource WindowBg}"
         Foreground="{StaticResource TextPri}"
         FontFamily="Segoe UI" FontSize="13">
+
+    <Window.Resources>
+        <!-- Map each ViewModel type to its View -->
+        <DataTemplate DataType="{x:Type vm:MainViewModel}">
+            <views:HomeView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:DataBrowserViewModel}">
+            <views:DataBrowserView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:ModelDerivativeViewModel}">
+            <views:ModelDerivativeView />
+        </DataTemplate>
+    </Window.Resources>
+
     <DockPanel>
 
         <!-- Menu -->
@@ -24,13 +37,8 @@
                           Command="{Binding ConnectCommand}" />
                 <MenuItem Header="_Disconnect"
                           Command="{Binding DisconnectCommand}" />
-                <MenuItem Header="_Refresh projects"
-                          Command="{Binding RefreshProjectsCommand}" />
                 <Separator />
                 <MenuItem Header="_Settings..." Click="Settings_Click" />
-            </MenuItem>
-            <MenuItem Header="_Tools" IsEnabled="{Binding IsConnected}">
-                <MenuItem Header="(no tools yet)" IsEnabled="False" />
             </MenuItem>
             <MenuItem Header="_Help">
                 <MenuItem Header="_About" Click="About_Click" />
@@ -58,9 +66,23 @@
             </StatusBarItem>
         </StatusBar>
 
-        <!-- Content area -->
+        <!-- Breadcrumb / back bar: only visible when a tool is active -->
+        <Border DockPanel.Dock="Top" Padding="12,6"
+                Background="{StaticResource Surface}"
+                BorderBrush="{StaticResource Border}" BorderThickness="0,0,0,1"
+                Visibility="{Binding IsHome, Converter={StaticResource InverseBoolToVisibility}}">
+            <StackPanel Orientation="Horizontal">
+                <Button Content="&lt; Home" Style="{StaticResource SecondaryBtn}"
+                        Padding="10,4" Command="{Binding GoHomeCommand}" />
+                <TextBlock Text="{Binding CurrentToolName}"
+                           FontWeight="SemiBold" VerticalAlignment="Center"
+                           Margin="12,0,0,0" />
+            </StackPanel>
+        </Border>
+
+        <!-- Main content: disconnected splash or active tool/home -->
         <Grid>
-            <!-- Welcome / disconnected prompt -->
+            <!-- Disconnected splash -->
             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
                         Visibility="{Binding IsDisconnected, Converter={StaticResource BoolToVisibility}}">
                 <TextBlock Text="APS Desktop App" FontSize="28" FontWeight="SemiBold"
@@ -79,103 +101,10 @@
                            Margin="0,14,0,0" />
             </StackPanel>
 
-            <!-- Connected view: hub/project browser -->
-            <Grid Margin="20"
-                  Visibility="{Binding IsConnected, Converter={StaticResource BoolToVisibility}}">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
-
-                <!-- Header row -->
-                <Grid Grid.Row="0" Margin="0,0,0,4">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0">
-                        <TextBlock Text="Hubs &amp; Projects" FontSize="18" FontWeight="SemiBold" />
-                        <TextBlock Text="{Binding StatusText}" Style="{StaticResource CaptionText}" />
-                    </StackPanel>
-                    <Button Grid.Column="1" Content="Refresh" VerticalAlignment="Top" Width="90"
-                            Style="{StaticResource SecondaryBtn}"
-                            Command="{Binding RefreshProjectsCommand}" />
-                </Grid>
-
-                <!-- Loading / empty-state message -->
-                <TextBlock Grid.Row="1" Margin="0,4,0,4" TextWrapping="Wrap"
-                           Style="{StaticResource CaptionText}"
-                           Text="{Binding ProjectsStatus}"
-                           Visibility="{Binding ProjectsStatus, Converter={StaticResource StringToVisibility}}" />
-
-                <!-- Browser: folder tree (left) + file details grid (right) -->
-                <Grid Grid.Row="2">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="2*" MinWidth="200" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="3*" MinWidth="260" />
-                    </Grid.ColumnDefinitions>
-
-                    <!-- Hub -> project -> folder tree (folders load on expand) -->
-                    <TreeView x:Name="BrowserTree" Grid.Column="0"
-                              ItemsSource="{Binding Hubs}"
-                              SelectedItemChanged="OnTreeSelectionChanged"
-                              Background="Transparent" BorderThickness="0">
-                        <TreeView.Resources>
-                            <HierarchicalDataTemplate DataType="{x:Type vm:HubNode}"
-                                                      ItemsSource="{Binding Projects}">
-                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
-                            </HierarchicalDataTemplate>
-                            <HierarchicalDataTemplate DataType="{x:Type vm:ProjectNode}"
-                                                      ItemsSource="{Binding Folders}">
-                                <TextBlock Text="{Binding Name}" />
-                            </HierarchicalDataTemplate>
-                            <HierarchicalDataTemplate DataType="{x:Type vm:FolderNode}"
-                                                      ItemsSource="{Binding Children}">
-                                <TextBlock Text="{Binding Name}" />
-                            </HierarchicalDataTemplate>
-                        </TreeView.Resources>
-                    </TreeView>
-
-                    <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center"
-                                  VerticalAlignment="Stretch"
-                                  Background="{StaticResource Border}" />
-
-                    <!-- File details for the selected folder -->
-                    <Grid Grid.Column="2" Margin="8,0,0,0">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
-
-                        <TextBlock Grid.Row="0" FontWeight="SemiBold" Margin="0,0,0,4"
-                                   Text="{Binding SelectedFolderName, TargetNullValue='Files',
-                                                  FallbackValue='Files'}" />
-
-                        <TextBlock Grid.Row="1" Margin="0,0,0,4" TextWrapping="Wrap"
-                                   Style="{StaticResource CaptionText}"
-                                   Text="{Binding FilesStatus}"
-                                   Visibility="{Binding FilesStatus,
-                                                Converter={StaticResource StringToVisibility}}" />
-
-                        <DataGrid Grid.Row="2" ItemsSource="{Binding Files}"
-                                  AutoGenerateColumns="False" IsReadOnly="True"
-                                  CanUserAddRows="False" GridLinesVisibility="Horizontal"
-                                  HeadersVisibility="Column">
-                            <DataGrid.Columns>
-                                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*" />
-                                <DataGridTextColumn Header="Type" Binding="{Binding FileType}" Width="Auto" />
-                                <DataGridTextColumn Header="Ver" Binding="{Binding Version}" Width="Auto" />
-                                <DataGridTextColumn Header="Size" Binding="{Binding Size}" Width="Auto" />
-                                <DataGridTextColumn Header="Modified" Binding="{Binding LastModified}" Width="Auto" />
-                                <DataGridTextColumn Header="Modified by" Binding="{Binding ModifiedBy}" Width="*" />
-                            </DataGrid.Columns>
-                        </DataGrid>
-                    </Grid>
-                </Grid>
-            </Grid>
+            <!-- Connected: ContentControl resolves ViewModel -> View via DataTemplates -->
+            <ContentControl Margin="20"
+                            Visibility="{Binding IsConnected, Converter={StaticResource BoolToVisibility}}"
+                            Content="{Binding ActiveContent}" />
         </Grid>
 
     </DockPanel>

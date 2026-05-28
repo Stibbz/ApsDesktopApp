@@ -6,8 +6,10 @@ namespace ApsDesktopApp.ViewModels;
 // display strings the DataGrid binds to (formatted size, version, local time).
 public class FileRow
 {
-    public FileRow(FileEntry entry)
+    public FileRow(FileEntry entry, string projectId)
     {
+        ItemId = entry.ItemId;
+        ProjectId = projectId;
         Name = entry.Name;
         FileType = entry.FileType;
         Version = entry.VersionNumber > 0 ? $"v{entry.VersionNumber}" : string.Empty;
@@ -16,6 +18,10 @@ public class FileRow
                        ?? string.Empty;
         ModifiedBy = entry.ModifiedBy;
     }
+
+    // Identifiers carried so the metadata inspector can fetch version history.
+    public string ItemId { get; }
+    public string ProjectId { get; }
 
     public string Name { get; }
     public string FileType { get; }
@@ -26,7 +32,7 @@ public class FileRow
 
     // Human-readable byte size: scales through B/KB/MB/GB/TB, one decimal place
     // above KB (e.g. "12.3 MB"), whole bytes below 1 KB.
-    private static string FormatSize(long bytes)
+    public static string FormatSize(long bytes)
     {
         if (bytes <= 0)
             return string.Empty;

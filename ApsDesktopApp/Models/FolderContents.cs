@@ -87,6 +87,7 @@ public class ResourceRef
 public record FolderEntry(string Id, string Name);
 
 public record FileEntry(
+    string ItemId,
     string Name,
     string FileType,
     int VersionNumber,
@@ -98,3 +99,12 @@ public record FileEntry(
 public record FolderContents(
     IReadOnlyList<FolderEntry> Folders,
     IReadOnlyList<FileEntry> Files);
+
+// One entry from an item's version history (GET .../items/{id}/versions). The
+// versions response is the same JSON:API shape, so it reuses ApiResource DTOs.
+public record VersionEntry(
+    int VersionNumber,
+    string FileType,
+    long SizeBytes,
+    DateTimeOffset? LastModified,
+    string ModifiedBy);

@@ -27,29 +27,43 @@ public partial class App : Application
                 "pack://application:,,,/ApsDesktopApp;component/Styles/AppStyles.xaml")
         });
         Resources.Add("BoolToVisibility", new BooleanToVisibilityConverter());
+        Resources.Add("InverseBoolToVisibility", new Converters.InverseBoolToVisibilityConverter());
         Resources.Add("StringToVisibility", new Converters.StringToVisibilityConverter());
 
         var services = new ServiceCollection();
-        // Plain HttpClient: the unauthenticated token endpoints use this.
+
+        // Plain HttpClient for the unauthenticated token endpoints; ApsAuthService
+        // resolves this one (no ApsAuthHandler, so the refresh call can't recurse).
         services.AddSingleton<HttpClient>();
         services.AddSingleton<TokenStorage>();
+        services.AddSingleton<ApsAuthService>();
         services.AddSingleton<ApsAuthHandler>();
 
-        // ApsAuthService gets two clients: the plain one above for token calls,
-        // and a data client whose ApsAuthHandler injects the bearer token (and
-        // refreshes on 401). The handler resolves ApsAuthService lazily, so this
-        // factory wiring is not a construction cycle.
-        services.AddSingleton<ApsAuthService>(sp =>
+        // Keyed "data" HttpClient: wrapped with ApsAuthHandler (injects bearer,
+        // retries on 401). Shared by every authenticated service. The handler
+        // resolves ApsAuthService lazily, so this is not a construction cycle.
+        services.AddKeyedSingleton<HttpClient>("data", (sp, _) =>
         {
             var handler = sp.GetRequiredService<ApsAuthHandler>();
             handler.InnerHandler = new HttpClientHandler();
-            var dataClient = new HttpClient(handler);
-            return new ApsAuthService(
-                sp.GetRequiredService<HttpClient>(),
-                dataClient,
-                sp.GetRequiredService<TokenStorage>());
+            return new HttpClient(handler);
         });
 
+        services.AddSingleton<ApsDataService>(sp => new ApsDataService(
+            sp.GetRequiredKeyedService<HttpClient>("data"),
+            sp.GetRequiredService<ApsAuthService>()));
+        services.AddSingleton<ModelDerivativeService>(sp => new ModelDerivativeService(
+            sp.GetRequiredKeyedService<HttpClient>("data")));
+
+        // Naming-convention rules: register each INamingRule; the engine receives
+        // them all via IEnumerable<INamingRule>. Add more rules by registering
+        // more implementations here.
+        services.AddSingleton<Services.Naming.INamingRule, Services.Naming.SegmentNamingRule>();
+        services.AddSingleton<Services.Naming.NamingRuleEngine>();
+
+        // Tools (one ViewModel each) + the shell that hosts them.
+        services.AddSingleton<DataBrowserViewModel>();
+        services.AddSingleton<ModelDerivativeViewModel>();
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainWindow>();
 
