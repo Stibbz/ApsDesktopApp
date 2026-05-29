@@ -73,7 +73,7 @@ public class ApsDataService
         EnsureConnected();
         var url = $"{HubsUrl}/{Uri.EscapeDataString(hubId)}/projects/"
                   + $"{Uri.EscapeDataString(projectId)}/topFolders";
-        var response = await GetJsonAsync<FolderContentsResponse>(url, cancellationToken);
+        var response = await GetJsonAsync<DataApiEnvelope>(url, cancellationToken);
         return ExtractFolders(response);
     }
 
@@ -85,7 +85,7 @@ public class ApsDataService
         EnsureConnected();
         var url = $"{DataUrl}/projects/{Uri.EscapeDataString(projectId)}/folders/"
                   + $"{Uri.EscapeDataString(folderId)}/contents";
-        var response = await GetJsonAsync<FolderContentsResponse>(url, cancellationToken);
+        var response = await GetJsonAsync<DataApiEnvelope>(url, cancellationToken);
         return new FolderContents(ExtractFolders(response), ExtractFiles(response));
     }
 
@@ -98,7 +98,7 @@ public class ApsDataService
         EnsureConnected();
         var url = $"{DataUrl}/projects/{Uri.EscapeDataString(projectId)}/items/"
                   + $"{Uri.EscapeDataString(itemId)}/versions";
-        var response = await GetJsonAsync<FolderContentsResponse>(url, cancellationToken);
+        var response = await GetJsonAsync<DataApiEnvelope>(url, cancellationToken);
 
         var versions = new List<VersionEntry>();
         if (response is not null)
@@ -122,7 +122,7 @@ public class ApsDataService
     }
 
     // Picks the "folders" resources out of a JSON:API data array.
-    private static IReadOnlyList<FolderEntry> ExtractFolders(FolderContentsResponse? response)
+    private static IReadOnlyList<FolderEntry> ExtractFolders(DataApiEnvelope? response)
     {
         var folders = new List<FolderEntry>();
         if (response is null)
@@ -140,7 +140,7 @@ public class ApsDataService
 
     // Joins each "items" resource to its tip "versions" resource in "included"
     // (via relationships.tip.data.id) to surface the file's real metadata.
-    private static IReadOnlyList<FileEntry> ExtractFiles(FolderContentsResponse? response)
+    private static IReadOnlyList<FileEntry> ExtractFiles(DataApiEnvelope? response)
     {
         var files = new List<FileEntry>();
         if (response is null)

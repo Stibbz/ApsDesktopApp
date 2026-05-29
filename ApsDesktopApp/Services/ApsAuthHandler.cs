@@ -18,7 +18,7 @@ namespace ApsDesktopApp.Services;
 // everything here is registered as a singleton so the lookup is cheap.
 public class ApsAuthHandler : DelegatingHandler
 {
-    private const string Cat = "ApsAuthHandler";
+    private const string LogCategory = "ApsAuthHandler";
 
     private readonly IServiceProvider _services;
     private readonly AppLogger        _log;
@@ -34,7 +34,7 @@ public class ApsAuthHandler : DelegatingHandler
     {
         var auth = _services.GetRequiredService<ApsAuthService>();
 
-        _log.Debug(Cat, $"Attaching 3-legged token (forceRefresh=false) for {request.RequestUri?.AbsolutePath}");
+        _log.Debug(LogCategory, $"Attaching 3-legged token (forceRefresh=false) for {request.RequestUri?.AbsolutePath}");
         await ApplyTokenAsync(request, auth, forceRefresh: false, cancellationToken);
         var response = await base.SendAsync(request, cancellationToken);
 
@@ -43,7 +43,7 @@ public class ApsAuthHandler : DelegatingHandler
 
         // The token was rejected. Force a single refresh and retry once on a
         // fresh copy (a sent HttpRequestMessage cannot be reused).
-        _log.Warn(Cat, $"401 received -- forcing token refresh and retrying {request.RequestUri?.AbsolutePath}");
+        _log.Warn(LogCategory, $"401 received -- forcing token refresh and retrying {request.RequestUri?.AbsolutePath}");
         response.Dispose();
         using var retry = Clone(request);
         await ApplyTokenAsync(retry, auth, forceRefresh: true, cancellationToken);

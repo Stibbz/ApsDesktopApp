@@ -11,7 +11,7 @@ namespace ApsDesktopApp.Services;
 // retries exactly once on 401 with a freshly fetched token.
 public class TwoLeggedAuthHandler : DelegatingHandler
 {
-    private const string Cat = "TwoLeggedAuth";
+    private const string LogCategory = "TwoLeggedAuth";
 
     private readonly TwoLeggedTokenService _tokens;
     private readonly AppLogger             _log;
@@ -25,7 +25,7 @@ public class TwoLeggedAuthHandler : DelegatingHandler
     protected override async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        _log.Debug(Cat, $"Attaching 2-legged token for {request.RequestUri?.AbsolutePath}");
+        _log.Debug(LogCategory, $"Attaching 2-legged token for {request.RequestUri?.AbsolutePath}");
         request.Headers.Authorization = new AuthenticationHeaderValue(
             "Bearer", await _tokens.GetTokenAsync(cancellationToken));
 
@@ -36,7 +36,7 @@ public class TwoLeggedAuthHandler : DelegatingHandler
         // Token was rejected server-side despite looking valid by the clock.
         // Invalidate the cache, re-fetch, and retry once on a fresh clone
         // (a sent HttpRequestMessage cannot be reused).
-        _log.Warn(Cat, $"401 received -- invalidating cached token and retrying {request.RequestUri?.AbsolutePath}");
+        _log.Warn(LogCategory, $"401 received -- invalidating cached token and retrying {request.RequestUri?.AbsolutePath}");
         response.Dispose();
         _tokens.Invalidate();
         using var retry = Clone(request);

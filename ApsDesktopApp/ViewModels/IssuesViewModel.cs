@@ -19,7 +19,7 @@ namespace ApsDesktopApp.ViewModels;
 
 public partial class IssuesViewModel : ObservableObject, IToolLifecycle
 {
-    private const string Cat = "Issues";
+    private const string LogCategory = "Issues";
 
     private readonly AccIssuesService  _issues;
     private readonly AccMembersService _members;
@@ -28,8 +28,8 @@ public partial class IssuesViewModel : ObservableObject, IToolLifecycle
     private readonly ObservableCollection<IssueRow> _allIssues = new();
 
     // Populated on load; used to show names in grid and resolve them back on import.
-    private Dictionary<string, string> _idToName = new(StringComparer.OrdinalIgnoreCase);
-    private Dictionary<string, string> _nameToId = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, string> _memberIdToName = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, string> _memberNameToId = new(StringComparer.OrdinalIgnoreCase);
 
     private string? _loadedProjectId;
 
@@ -59,8 +59,8 @@ public partial class IssuesViewModel : ObservableObject, IToolLifecycle
         if (e.PropertyName != nameof(ProjectContextViewModel.SelectedProject)) return;
 
         _allIssues.Clear();
-        _idToName        = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        _nameToId        = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        _memberIdToName        = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        _memberNameToId        = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         _loadedProjectId = null;
         SearchText       = string.Empty;
         Status           = string.Empty;
@@ -120,11 +120,11 @@ public partial class IssuesViewModel : ObservableObject, IToolLifecycle
         TotalCount       = 0;
         Status           = string.Empty;
         _allIssues.Clear();
-        _idToName        = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        _nameToId        = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        _memberIdToName        = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        _memberNameToId        = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         _loadedProjectId = project.ProjectId;
 
-        _log.Info(Cat, $"Loading issues for {project.ProjectName}");
+        _log.Info(LogCategory, $"Loading issues for {project.ProjectName}");
 
         var progress = new Progress<(int loaded, int total)>(p =>
         {
@@ -141,23 +141,23 @@ public partial class IssuesViewModel : ObservableObject, IToolLifecycle
             var membersTask = _members.GetMemberLookupAsync(project.ProjectId, cts.Token);
             await Task.WhenAll(issuesTask, membersTask);
 
-            _idToName = membersTask.Result;
+            _memberIdToName = membersTask.Result;
             // Reverse lookup for import: name -> id (case-insensitive).
-            foreach (var kv in _idToName)
-                _nameToId.TryAdd(kv.Value, kv.Key);
+            foreach (var kv in _memberIdToName)
+                _memberNameToId.TryAdd(kv.Value, kv.Key);
 
             string NameOf(string? id) =>
-                !string.IsNullOrEmpty(id) && _idToName.TryGetValue(id, out var n) ? n : id ?? string.Empty;
+                !string.IsNullOrEmpty(id) && _memberIdToName.TryGetValue(id, out var n) ? n : id ?? string.Empty;
 
             foreach (var issue in issuesTask.Result)
                 _allIssues.Add(IssueRow.FromApi(issue, NameOf));
 
             OnPropertyChanged(nameof(IssueCount));
-            _log.Info(Cat, $"Loaded {_allIssues.Count} issues, {_idToName.Count} members resolved");
+            _log.Info(LogCategory, $"Loaded {_allIssues.Count} issues, {_memberIdToName.Count} members resolved");
         }
         catch (Exception ex)
         {
-            _log.Error(Cat, $"Load failed: {ex.Message}");
+            _log.Error(LogCategory, $"Load failed: {ex.Message}");
             Status = $"Failed to load issues: {ex.Message}";
         }
         finally
@@ -190,12 +190,12 @@ public partial class IssuesViewModel : ObservableObject, IToolLifecycle
         try
         {
             await Task.Run(() => WriteExcel(dialog.FileName));
-            _log.Info(Cat, $"Exported {_allIssues.Count} issues to {dialog.FileName}");
+            _log.Info(LogCategory, $"Exported {_allIssues.Count} issues to {dialog.FileName}");
             Status = $"Exported {_allIssues.Count} issues.";
         }
         catch (Exception ex)
         {
-            _log.Error(Cat, $"Export failed: {ex.Message}");
+            _log.Error(LogCategory, $"Export failed: {ex.Message}");
             Status = $"Export failed: {ex.Message}";
         }
         finally
@@ -291,10 +291,10 @@ public partial class IssuesViewModel : ObservableObject, IToolLifecycle
 
         IsBusy = true;
         Status = "Reading workbook...";
-        _log.Info(Cat, $"Import started: {dialog.FileName}");
+        _log.Info(LogCategory, $"Import started: {dialog.FileName}");
 
         // Capture the lookups for use on the thread pool.
-        var nameToId = new Dictionary<string, string>(_nameToId, StringComparer.OrdinalIgnoreCase);
+        var nameToId = new Dictionary<string, string>(_memberNameToId, StringComparer.OrdinalIgnoreCase);
 
         int ok = 0, failed = 0;
         bool anyUpdated = false;
@@ -320,20 +320,20 @@ public partial class IssuesViewModel : ObservableObject, IToolLifecycle
                 catch (Exception ex)
                 {
                     failed++;
-                    _log.Warn(Cat, $"PATCH {issueId} failed: {ex.Message}");
+                    _log.Warn(LogCategory, $"PATCH {issueId} failed: {ex.Message}");
                 }
                 await Task.Delay(150, cts.Token);
             }
 
             anyUpdated = ok > 0;
-            _log.Info(Cat, $"Import done: {ok} updated, {failed} failed");
+            _log.Info(LogCategory, $"Import done: {ok} updated, {failed} failed");
             Status = failed == 0
                 ? $"Import complete: {ok} issue(s) updated. Refreshing..."
                 : $"Import finished: {ok} updated, {failed} failed (see logs). Refreshing...";
         }
         catch (Exception ex)
         {
-            _log.Error(Cat, $"Import failed: {ex.Message}");
+            _log.Error(LogCategory, $"Import failed: {ex.Message}");
             Status = $"Import failed: {ex.Message}";
         }
         finally
@@ -431,8 +431,8 @@ public partial class IssuesViewModel : ObservableObject, IToolLifecycle
     public void Reset()
     {
         _allIssues.Clear();
-        _idToName        = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        _nameToId        = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        _memberIdToName        = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        _memberNameToId        = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         _loadedProjectId = null;
         SearchText       = string.Empty;
         Status           = string.Empty;
@@ -440,42 +440,4 @@ public partial class IssuesViewModel : ObservableObject, IToolLifecycle
         TotalCount       = 0;
         OnPropertyChanged(nameof(IssueCount));
     }
-}
-
-// Immutable row shown in the DataGrid. Names (assignedTo/owner/createdBy) are
-// already resolved from user IDs at construction time via the nameOf delegate.
-public class IssueRow
-{
-    public string  Id          { get; private init; } = string.Empty;
-    public int     DisplayId   { get; private init; }
-    public string  Title       { get; private init; } = string.Empty;
-    public string  Status      { get; private init; } = string.Empty;
-    public string  Type        { get; private init; } = string.Empty;
-    public string  AssignedTo  { get; private init; } = string.Empty;
-    public string  CreatedBy   { get; private init; } = string.Empty;
-    public string  Owner       { get; private init; } = string.Empty;
-    public string  CreatedAt   { get; private init; } = string.Empty;
-    public string  DueDate     { get; private init; } = string.Empty;
-    public string  ClosedAt    { get; private init; } = string.Empty;
-    public string? Description { get; private init; }
-
-    public static IssueRow FromApi(AccIssue a, Func<string?, string> nameOf) => new()
-    {
-        Id         = a.Id,
-        DisplayId  = a.DisplayId,
-        Title      = a.Title      ?? string.Empty,
-        Status     = a.Status     ?? string.Empty,
-        Type       = a.IssueType?.Title ?? string.Empty,
-        AssignedTo = nameOf(a.AssignedTo),
-        CreatedBy  = nameOf(a.CreatedBy),
-        Owner      = nameOf(a.OwnerId),
-        CreatedAt  = a.CreatedAt.HasValue
-                       ? a.CreatedAt.Value.ToLocalTime().ToString("yyyy-MM-dd")
-                       : string.Empty,
-        DueDate    = a.DueDate    ?? string.Empty,
-        ClosedAt   = a.ClosedAt.HasValue
-                       ? a.ClosedAt.Value.ToLocalTime().ToString("yyyy-MM-dd")
-                       : string.Empty,
-        Description = a.Description,
-    };
 }

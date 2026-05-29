@@ -16,7 +16,7 @@ public class AccIssuesService
 {
     private const string BaseUrl = "https://developer.api.autodesk.com/construction/issues/v1";
     private const int PageSize = 100;
-    private const string Cat = "AccIssues";
+    private const string LogCategory = "AccIssues";
 
     private readonly HttpClient _http;
     private readonly ApsAuthService _auth;
@@ -56,7 +56,7 @@ public class AccIssuesService
 
             offset += response.Results.Count;
             progress?.Report((all.Count, total < 0 ? 0 : total));
-            _log.Debug(Cat, $"Page loaded: {all.Count}/{(total < 0 ? "?" : total)} issues");
+            _log.Debug(LogCategory, $"Page loaded: {all.Count}/{(total < 0 ? "?" : total)} issues");
 
             if (response.Results.Count < PageSize) break;
 
@@ -64,7 +64,7 @@ public class AccIssuesService
             await Task.Delay(100, ct);
         }
 
-        _log.Info(Cat, $"Loaded {all.Count} issues for project {pid}");
+        _log.Info(LogCategory, $"Loaded {all.Count} issues for project {pid}");
         return all;
     }
 
@@ -81,7 +81,7 @@ public class AccIssuesService
         var url = $"{BaseUrl}/projects/{Uri.EscapeDataString(pid)}/issues/{Uri.EscapeDataString(issueId)}";
 
         var json = JsonSerializer.Serialize(fields);
-        _log.Debug(Cat, $"PATCH issue {issueId}: {json}");
+        _log.Debug(LogCategory, $"PATCH issue {issueId}: {json}");
 
         using var content = new StringContent(json, Encoding.UTF8, "application/json");
         using var request = new HttpRequestMessage(new HttpMethod("PATCH"), url)
@@ -93,7 +93,7 @@ public class AccIssuesService
         if (!response.IsSuccessStatusCode)
         {
             var body = await response.Content.ReadAsStringAsync(ct);
-            _log.Error(Cat, $"PATCH {issueId} failed {(int)response.StatusCode}: {body}");
+            _log.Error(LogCategory, $"PATCH {issueId} failed {(int)response.StatusCode}: {body}");
             throw new HttpRequestException(
                 $"Issue update failed ({(int)response.StatusCode}): {body}");
         }
@@ -120,7 +120,7 @@ public class AccIssuesService
         if (!response.IsSuccessStatusCode)
         {
             var body = await response.Content.ReadAsStringAsync(ct);
-            _log.Error(Cat, $"GET {url} -> {(int)response.StatusCode}: {body}");
+            _log.Error(LogCategory, $"GET {url} -> {(int)response.StatusCode}: {body}");
             response.EnsureSuccessStatusCode();
         }
 

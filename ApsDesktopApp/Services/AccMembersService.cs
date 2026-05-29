@@ -14,7 +14,7 @@ namespace ApsDesktopApp.Services;
 public class AccMembersService
 {
     private const string AdminBase = "https://developer.api.autodesk.com/construction/admin/v1";
-    private const string Cat       = "AccMembers";
+    private const string LogCategory = "AccMembers";
 
     private readonly HttpClient     _http;
     private readonly ApsAuthService _auth;
@@ -39,7 +39,7 @@ public class AccMembersService
         var lookup = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         int offset = 0;
 
-        _log.Info(Cat, $"Fetching members: {url}");
+        _log.Info(LogCategory, $"Fetching members: {url}");
 
         while (true)
         {
@@ -60,22 +60,22 @@ public class AccMembersService
                 }
 
                 offset += response.Results.Count;
-                _log.Debug(Cat, $"Page loaded: {offset} members so far");
+                _log.Debug(LogCategory, $"Page loaded: {offset} members so far");
                 if (response.Results.Count < 100) break;
             }
             catch (HttpRequestException ex)
             {
-                _log.Warn(Cat, $"Member API call failed: {ex.Message}");
+                _log.Warn(LogCategory, $"Member API call failed: {ex.Message}");
                 break;
             }
             catch (Exception ex)
             {
-                _log.Warn(Cat, $"Member fetch stopped: {ex.Message}");
+                _log.Warn(LogCategory, $"Member fetch stopped: {ex.Message}");
                 break;
             }
         }
 
-        _log.Info(Cat, $"Member lookup ready: {lookup.Count} key(s) across {offset} member(s)");
+        _log.Info(LogCategory, $"Member lookup ready: {lookup.Count} key(s) across {offset} member(s)");
         return lookup;
     }
 

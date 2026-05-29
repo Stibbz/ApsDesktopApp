@@ -15,7 +15,7 @@ public record FormatOption(string DisplayName, string ApiValue, string FileExten
 
 public partial class FileConverterViewModel : ObservableObject, IToolLifecycle
 {
-    private const string Cat = "FileConverter";
+    private const string LogCategory = "FileConverter";
 
     private readonly ModelDerivativeService _service;
     private readonly AppLogger              _log;
@@ -91,7 +91,7 @@ public partial class FileConverterViewModel : ObservableObject, IToolLifecycle
         IsReadyToDownload = false;
         _readyDerivativeUrn = null;
 
-        _log.Info(Cat, $"Convert requested: file={FileName} format={SelectedFormat?.ApiValue}");
+        _log.Info(LogCategory, $"Convert requested: file={FileName} format={SelectedFormat?.ApiValue}");
 
         try
         {
@@ -106,7 +106,7 @@ public partial class FileConverterViewModel : ObservableObject, IToolLifecycle
 
             if (existing?.Status == "success")
             {
-                _log.Info(Cat, $"Existing {SelectedFormat!.ApiValue} derivative found -- prompting user");
+                _log.Info(LogCategory, $"Existing {SelectedFormat!.ApiValue} derivative found -- prompting user");
 
                 var fmt = SelectedFormat.ApiValue.ToUpperInvariant();
                 var choice = MessageBox.Show(
@@ -125,17 +125,17 @@ public partial class FileConverterViewModel : ObservableObject, IToolLifecycle
 
                     if (_readyDerivativeUrn is not null)
                     {
-                        _log.Info(Cat, $"Using existing derivative: {_readyDerivativeUrn}");
+                        _log.Info(LogCategory, $"Using existing derivative: {_readyDerivativeUrn}");
                         IsReadyToDownload = true;
                         Status = string.Empty;
                         return;
                     }
                     // Existing derivative has no downloadable resource -- fall through to new job.
-                    _log.Warn(Cat, "Existing derivative has no resource URN -- submitting new job");
+                    _log.Warn(LogCategory, "Existing derivative has no resource URN -- submitting new job");
                 }
                 else
                 {
-                    _log.Info(Cat, "User chose to regenerate -- submitting new job");
+                    _log.Info(LogCategory, "User chose to regenerate -- submitting new job");
                 }
             }
 
@@ -144,7 +144,7 @@ public partial class FileConverterViewModel : ObservableObject, IToolLifecycle
             await _service.StartTranslationAsync(
                 VersionUrn.Trim(), SelectedFormat!.ApiValue, cts.Token);
 
-            _log.Info(Cat, "Job submitted -- starting poll loop");
+            _log.Info(LogCategory, "Job submitted -- starting poll loop");
             Status = string.Empty;
             IsPolling = true;
             var pollCts = new CancellationTokenSource();
@@ -153,7 +153,7 @@ public partial class FileConverterViewModel : ObservableObject, IToolLifecycle
         }
         catch (Exception ex)
         {
-            _log.Error(Cat, $"StartTranslation failed: {ex.Message}");
+            _log.Error(LogCategory, $"StartTranslation failed: {ex.Message}");
             Status = $"Could not start conversion: {ex.Message}";
         }
         finally
@@ -171,7 +171,7 @@ public partial class FileConverterViewModel : ObservableObject, IToolLifecycle
             {
                 if (DateTime.UtcNow > deadline)
                 {
-                    _log.Warn(Cat, "Poll timeout: derivative not ready after 15 minutes");
+                    _log.Warn(LogCategory, "Poll timeout: derivative not ready after 15 minutes");
                     Status = "Conversion timed out -- the APS job may still be running but could not be confirmed.";
                     break;
                 }
@@ -183,7 +183,7 @@ public partial class FileConverterViewModel : ObservableObject, IToolLifecycle
 
                 if (manifest is null)
                 {
-                    _log.Warn(Cat, "Poll: manifest not found -- job may have been cleared from APS");
+                    _log.Warn(LogCategory, "Poll: manifest not found -- job may have been cleared from APS");
                     Status = "Conversion record not found on APS. It may have been cleared.";
                     break;
                 }
@@ -193,7 +193,7 @@ public partial class FileConverterViewModel : ObservableObject, IToolLifecycle
                         d.OutputType, SelectedFormat!.ApiValue,
                         StringComparison.OrdinalIgnoreCase));
 
-                _log.Debug(Cat,
+                _log.Debug(LogCategory,
                     $"Poll tick: manifest={manifest.Status} derivative={derivative?.Status ?? "not found"}");
 
                 if (derivative?.Status == "success")
@@ -203,13 +203,13 @@ public partial class FileConverterViewModel : ObservableObject, IToolLifecycle
 
                     if (_readyDerivativeUrn is not null)
                     {
-                        _log.Info(Cat, $"Conversion ready: derivative={_readyDerivativeUrn}");
+                        _log.Info(LogCategory, $"Conversion ready: derivative={_readyDerivativeUrn}");
                         IsReadyToDownload = true;
                         Status = string.Empty;
                     }
                     else
                     {
-                        _log.Warn(Cat, "Conversion succeeded but no resource URN found in manifest children");
+                        _log.Warn(LogCategory, "Conversion succeeded but no resource URN found in manifest children");
                         Status = "Conversion complete but no downloadable file was found in the manifest.";
                     }
                     break;
@@ -217,7 +217,7 @@ public partial class FileConverterViewModel : ObservableObject, IToolLifecycle
 
                 if (derivative?.Status == "failed" || manifest.Status == "failed" || manifest.Status == "timeout")
                 {
-                    _log.Warn(Cat,
+                    _log.Warn(LogCategory,
                         $"Conversion failed: manifest={manifest.Status} derivative={derivative?.Status}");
                     Status = $"Conversion failed -- "
                            + $"{SelectedFormat!.ApiValue.ToUpperInvariant()} may not be supported for this file type.";
@@ -229,7 +229,7 @@ public partial class FileConverterViewModel : ObservableObject, IToolLifecycle
         catch (OperationCanceledException) { }
         catch (Exception ex)
         {
-            _log.Error(Cat, $"Poll error: {ex.Message}");
+            _log.Error(LogCategory, $"Poll error: {ex.Message}");
             Status = $"Status check failed: {ex.Message}";
         }
         finally
@@ -255,19 +255,19 @@ public partial class FileConverterViewModel : ObservableObject, IToolLifecycle
 
         IsBusy = true;
         Status = "Downloading...";
-        _log.Info(Cat, $"Download started: destination={dialog.FileName}");
+        _log.Info(LogCategory, $"Download started: destination={dialog.FileName}");
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
             var bytes = await _service.DownloadDerivativeAsync(
                 VersionUrn.Trim(), _readyDerivativeUrn, cts.Token);
             await File.WriteAllBytesAsync(dialog.FileName, bytes, cts.Token);
-            _log.Info(Cat, $"Download complete: {bytes.Length:N0} bytes -> {dialog.FileName}");
+            _log.Info(LogCategory, $"Download complete: {bytes.Length:N0} bytes -> {dialog.FileName}");
             Status = $"Saved to {dialog.FileName}";
         }
         catch (Exception ex)
         {
-            _log.Error(Cat, $"Download failed: {ex.Message}");
+            _log.Error(LogCategory, $"Download failed: {ex.Message}");
             Status = $"Download failed: {ex.Message}";
         }
         finally

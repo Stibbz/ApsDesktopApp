@@ -5,13 +5,14 @@ using System.Text.Json.Serialization;
 namespace ApsDesktopApp.Models;
 
 // --- Raw JSON:API DTOs ----------------------------------------------------
-// Both the "topFolders" and "folder contents" responses use the JSON:API
-// envelope: { "data": [ ... ], "included": [ ... ] }. The contents response
-// mixes folders and items in "data" (tell them apart via "type"), and a file's
-// real metadata lives in the "included" array as a "versions" resource that the
-// item points at through relationships.tip.data.id.
+// Generic JSON:API envelope used by all APS Data Management responses:
+// topFolders, folder contents, and item versions all share this shape.
+// { "data": [ ... ], "included": [ ... ] }
+// Folder contents mixes folders and items in "data" (tell them apart via "type"),
+// and a file's metadata lives in "included" as a "versions" resource linked via
+// relationships.tip.data.id.
 
-public class FolderContentsResponse
+public class DataApiEnvelope
 {
     [JsonPropertyName("data")]
     public List<ApiResource> Data { get; set; } = new();

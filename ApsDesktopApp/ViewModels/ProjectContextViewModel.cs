@@ -16,7 +16,7 @@ namespace ApsDesktopApp.ViewModels;
 // Selection is persisted in AppSettings so it survives restarts.
 public partial class ProjectContextViewModel : ObservableObject
 {
-    private const string Cat = "ProjectContext";
+    private const string LogCategory = "ProjectContext";
 
     private readonly ApsDataService _data;
     private readonly AppLogger _log;
@@ -79,7 +79,7 @@ public partial class ProjectContextViewModel : ObservableObject
                 }
                 catch (Exception ex)
                 {
-                    _log.Warn(Cat, $"Failed to load projects for hub {h.Name}: {ex.Message}");
+                    _log.Warn(LogCategory, $"Failed to load projects for hub {h.Name}: {ex.Message}");
                     return new List<ProjectEntry>();
                 }
             });
@@ -98,11 +98,11 @@ public partial class ProjectContextViewModel : ObservableObject
                     SelectedProject = last;
             }
 
-            _log.Info(Cat, $"Loaded {AllProjects.Count} project(s) across {hubs.Count} hub(s)");
+            _log.Info(LogCategory, $"Loaded {AllProjects.Count} project(s) across {hubs.Count} hub(s)");
         }
         catch (Exception ex)
         {
-            _log.Warn(Cat, $"Failed to load hubs: {ex.Message}");
+            _log.Warn(LogCategory, $"Failed to load hubs: {ex.Message}");
         }
         finally
         {

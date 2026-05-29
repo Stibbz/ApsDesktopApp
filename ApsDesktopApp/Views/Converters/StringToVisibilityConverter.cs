@@ -3,11 +3,9 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
 
-namespace ApsDesktopApp.Converters;
+namespace ApsDesktopApp.Views.Converters;
 
 // Collapses an element when its bound string is null/empty, otherwise shows it.
-// Used so the projects status message only takes space when there's something
-// to say.
 public class StringToVisibilityConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)

@@ -17,7 +17,7 @@ namespace ApsDesktopApp.Services;
 public class ModelDerivativeService
 {
     private const string Base = "https://developer.api.autodesk.com/modelderivative/v2/designdata";
-    private const string Cat  = "ModelDerivative";
+    private const string LogCategory = "ModelDerivative";
 
     private readonly HttpClient _http;
     private readonly AppLogger  _log;
@@ -40,7 +40,7 @@ public class ModelDerivativeService
         string outputFormat,
         CancellationToken cancellationToken)
     {
-        _log.Info(Cat, $"StartTranslation: format={outputFormat} urn={Short(versionUrn)}");
+        _log.Info(LogCategory, $"StartTranslation: format={outputFormat} urn={Short(versionUrn)}");
 
         var outputNode = outputFormat is "svf" or "svf2"
             ? new JsonObject { ["type"] = outputFormat, ["views"] = new JsonArray("2d", "3d") }
@@ -63,13 +63,13 @@ public class ModelDerivativeService
         using var response = await _http.SendAsync(request, cancellationToken);
         if (response.StatusCode == HttpStatusCode.Conflict)
         {
-            _log.Debug(Cat, "StartTranslation: HTTP 409 -- job already queued or complete");
+            _log.Debug(LogCategory, "StartTranslation: HTTP 409 -- job already queued or complete");
             return;
         }
         await EnsureSuccessAsync(response, cancellationToken);
         var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
-        _log.Info(Cat, $"StartTranslation: job submitted (HTTP {(int)response.StatusCode})");
-        _log.Debug(Cat, $"StartTranslation response: {(responseBody.Length > 500 ? responseBody[..500] : responseBody)}");
+        _log.Info(LogCategory, $"StartTranslation: job submitted (HTTP {(int)response.StatusCode})");
+        _log.Debug(LogCategory, $"StartTranslation response: {(responseBody.Length > 500 ? responseBody[..500] : responseBody)}");
     }
 
     // Returns the manifest for the given URN, or null if no job has been started (404).
@@ -77,7 +77,7 @@ public class ModelDerivativeService
         string versionUrn,
         CancellationToken cancellationToken)
     {
-        _log.Debug(Cat, $"GetManifest: urn={Short(versionUrn)}");
+        _log.Debug(LogCategory, $"GetManifest: urn={Short(versionUrn)}");
 
         var urn = ToBase64Url(versionUrn);
         using var request = new HttpRequestMessage(HttpMethod.Get, $"{Base}/{urn}/manifest");
@@ -86,23 +86,23 @@ public class ModelDerivativeService
         using var response = await _http.SendAsync(request, cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
-            _log.Debug(Cat, "GetManifest: HTTP 404 -- no manifest exists yet");
+            _log.Debug(LogCategory, "GetManifest: HTTP 404 -- no manifest exists yet");
             return null;
         }
         await EnsureSuccessAsync(response, cancellationToken);
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         var manifest = JsonSerializer.Deserialize<ManifestStatus>(json);
-        _log.Debug(Cat, $"GetManifest: status={manifest?.Status ?? "null"} progress={manifest?.Progress ?? "?"}");
+        _log.Debug(LogCategory, $"GetManifest: status={manifest?.Status ?? "null"} progress={manifest?.Progress ?? "?"}");
 
         if (manifest?.Derivatives is { Count: > 0 })
         {
             foreach (var d in manifest.Derivatives)
-                _log.Debug(Cat, $"  derivative: outputType={d.OutputType} status={d.Status} children={d.Children?.Count ?? 0}");
+                _log.Debug(LogCategory, $"  derivative: outputType={d.OutputType} status={d.Status} children={d.Children?.Count ?? 0}");
         }
         else
         {
-            _log.Debug(Cat, "  derivatives: (none)");
+            _log.Debug(LogCategory, "  derivatives: (none)");
         }
 
         return manifest;
@@ -115,7 +115,7 @@ public class ModelDerivativeService
         string derivativeUrn,
         CancellationToken cancellationToken)
     {
-        _log.Info(Cat, $"DownloadDerivative: {Short(derivativeUrn)}");
+        _log.Info(LogCategory, $"DownloadDerivative: {Short(derivativeUrn)}");
 
         var urn = ToBase64Url(versionUrn);
         var encodedDerivative = Uri.EscapeDataString(derivativeUrn);
@@ -126,7 +126,7 @@ public class ModelDerivativeService
         using var response = await _http.SendAsync(request, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
         var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
-        _log.Info(Cat, $"DownloadDerivative: received {bytes.Length:N0} bytes");
+        _log.Info(LogCategory, $"DownloadDerivative: received {bytes.Length:N0} bytes");
         return bytes;
     }
 

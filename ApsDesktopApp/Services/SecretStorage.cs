@@ -13,12 +13,12 @@ public class SecretStorage
     {
         var bytes = Encoding.UTF8.GetBytes(secret);
         var encrypted = ProtectedData.Protect(bytes, null, DataProtectionScope.CurrentUser);
-        File.WriteAllBytes(AppPaths.MdSecretFile, encrypted);
+        File.WriteAllBytes(AppPaths.ModelDerivativeSecretFile, encrypted);
     }
 
     public string? Load()
     {
-        var path = AppPaths.MdSecretFile;
+        var path = AppPaths.ModelDerivativeSecretFile;
         if (!File.Exists(path))
             return null;
 
@@ -34,11 +34,11 @@ public class SecretStorage
         }
     }
 
-    public bool HasSecret => File.Exists(AppPaths.MdSecretFile);
+    public bool HasSecret => File.Exists(AppPaths.ModelDerivativeSecretFile);
 
     public void Clear()
     {
-        var path = AppPaths.MdSecretFile;
+        var path = AppPaths.ModelDerivativeSecretFile;
         if (File.Exists(path))
             File.Delete(path);
     }

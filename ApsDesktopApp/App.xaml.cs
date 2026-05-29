@@ -27,9 +27,9 @@ public partial class App : Application
                 "pack://application:,,,/ApsDesktopApp;component/Styles/AppStyles.xaml")
         });
         Resources.Add("BoolToVisibility", new BooleanToVisibilityConverter());
-        Resources.Add("InverseBoolToVisibility", new Converters.InverseBoolToVisibilityConverter());
-        Resources.Add("InverseBool", new Converters.InverseBoolConverter());
-        Resources.Add("StringToVisibility", new Converters.StringToVisibilityConverter());
+        Resources.Add("InverseBoolToVisibility", new Views.Converters.InverseBoolToVisibilityConverter());
+        Resources.Add("InverseBool", new Views.Converters.InverseBoolConverter());
+        Resources.Add("StringToVisibility", new Views.Converters.StringToVisibilityConverter());
 
         var services = new ServiceCollection();
 
