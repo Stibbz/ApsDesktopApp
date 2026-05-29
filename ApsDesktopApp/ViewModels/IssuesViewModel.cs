@@ -426,7 +426,12 @@ public partial class IssuesViewModel : ObservableObject, IToolLifecycle
 
     // -- Lifecycle ------------------------------------------------------------
 
-    public Task ActivateAsync() => Task.CompletedTask;
+    public Task ActivateAsync()
+    {
+        if (_loadedProjectId is null && ProjectContext.SelectedProject is not null)
+            return LoadAsync();
+        return Task.CompletedTask;
+    }
 
     public void Reset()
     {

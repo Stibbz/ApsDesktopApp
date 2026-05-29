@@ -87,7 +87,10 @@ Grows tool-by-tool; sole user now, intended for colleague distribution later.
 - Requires `account:read` scope on the 3-legged token. Without it, APS returns 404 (not 401/403) even for Project Admins.
 - Adding a scope to `ApsAuthService.Scopes` takes effect only after the user signs out and back in -- token refresh reuses the old scope set.
 - Ground-truth endpoint URLs: check `github.com/autodesk-platform-services/aps-sdk-net` samples + generated source before assuming a URL from prose docs.
-- **Construction Issues API accepts `x-ads-region`** -- send it (from `AppSettings.Load().Region`) on every GET and PATCH, same as `ModelDerivativeService`. Default to `"US"` if unset.
+- **Do NOT send `x-ads-region` on Construction Issues API requests.** The Issues API resolves
+  the regional server from the container ID internally; sending the header routes to the wrong
+  regional deployment if the project's actual region differs from `AppSettings.Region`, causing 404.
+  (Model Derivative needs the header because it creates new jobs; Issues does not.)
 
 ## Layout
 - `Models/` — DTOs (TokenInfo, UserProfile)

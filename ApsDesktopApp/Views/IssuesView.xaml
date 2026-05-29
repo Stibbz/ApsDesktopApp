@@ -40,7 +40,7 @@
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>   <!-- header + project picker -->
+            <RowDefinition Height="Auto"/>   <!-- header -->
             <RowDefinition Height="Auto"/>   <!-- search + load -->
             <RowDefinition Height="Auto"/>   <!-- progress -->
             <RowDefinition Height="*"/>      <!-- grid -->
@@ -58,33 +58,7 @@
                 <TextBlock Text="Issues Manager" FontSize="18" FontWeight="SemiBold"
                            Margin="0,0,0,2"/>
                 <TextBlock Style="{StaticResource CaptionText}" TextWrapping="Wrap"
-                           Margin="0,0,0,12"
                            Text="Load all issues from an ACC project. Search and sort the table, then export to Excel for bulk editing. Import the workbook to push changes back."/>
-
-                <!-- Unified project picker (single ComboBox, persists across tools) -->
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="260"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-
-                    <TextBlock Grid.Column="0" Text="Project" VerticalAlignment="Center"
-                               FontWeight="SemiBold" Margin="0,0,8,0"/>
-                    <ComboBox  Grid.Column="1"
-                               ItemsSource="{Binding ProjectContext.AllProjects}"
-                               SelectedItem="{Binding ProjectContext.SelectedProject}"
-                               DisplayMemberPath="DisplayName"
-                               Height="28"
-                               IsEnabled="{Binding ProjectContext.IsLoading,
-                                           Converter={StaticResource InverseBool}}"/>
-                    <!-- Spinner while projects are loading -->
-                    <TextBlock Grid.Column="2" Margin="10,0,0,0"
-                               Style="{StaticResource CaptionText}" VerticalAlignment="Center"
-                               Text="Loading projects..."
-                               Visibility="{Binding ProjectContext.IsLoading,
-                                            Converter={StaticResource BoolToVisibility}}"/>
-                </Grid>
             </StackPanel>
 
             <Button Grid.Column="1" Content="Logs" Width="56" Height="28"
@@ -93,20 +67,24 @@
                     Click="ShowLogs_Click"/>
         </Grid>
 
-        <!-- Search + Load -->
+        <!-- Search + Refresh -->
         <Grid Grid.Row="1" Margin="0,0,0,10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="16"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <TextBlock Grid.Column="0" Text="Search" VerticalAlignment="Center"
+            <Button Grid.Column="0" Content="Refresh" Width="90" Height="28"
+                    Style="{StaticResource PrimaryBtn}"
+                    Command="{Binding LoadCommand}"/>
+
+            <TextBlock Grid.Column="2" Text="Search" VerticalAlignment="Center"
                        FontWeight="SemiBold" Margin="0,0,8,0"/>
 
             <!-- TextBox with watermark placeholder -->
-            <Grid Grid.Column="1">
+            <Grid Grid.Column="3">
                 <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                          Height="28" Padding="6,0" VerticalContentAlignment="Center"
                          IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBool}}"/>
@@ -126,10 +104,6 @@
                     </TextBlock.Style>
                 </TextBlock>
             </Grid>
-
-            <Button Grid.Column="3" Content="Load Issues" Width="110" Height="28"
-                    Style="{StaticResource PrimaryBtn}"
-                    Command="{Binding LoadCommand}"/>
         </Grid>
 
         <!-- Progress bar -->

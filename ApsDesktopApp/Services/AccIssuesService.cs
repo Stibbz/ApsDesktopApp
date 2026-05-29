@@ -37,6 +37,9 @@ public class AccIssuesService
     {
         EnsureConnected();
         var pid = StripPrefix(projectId);
+        if (!Guid.TryParse(pid, out _))
+            throw new InvalidOperationException(
+                "Issues are only available for ACC projects. This project appears to be a BIM360 legacy project.");
         var baseUrl = $"{BaseUrl}/projects/{Uri.EscapeDataString(pid)}/issues";
 
         var all = new List<AccIssue>();
@@ -88,7 +91,6 @@ public class AccIssuesService
         {
             Content = content
         };
-        request.Headers.Add("x-ads-region", RegionHeader());
         using var response = await _http.SendAsync(request, ct);
 
         if (!response.IsSuccessStatusCode)
@@ -98,6 +100,24 @@ public class AccIssuesService
             throw new HttpRequestException(
                 $"Issue update failed ({(int)response.StatusCode}): {body}");
         }
+    }
+
+    private static string ExtractApsError(string body, int statusCode)
+    {
+        try
+        {
+            var doc  = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+            var code = root.TryGetProperty("errorCode", out var ec) ? ec.GetString() : null;
+            var title = root.TryGetProperty("title", out var t) ? t.GetString() : null;
+
+            if (code == "ISSUES_SERVICE_NOT_FOUND")
+                return "Issues module is not enabled for this project. Enable it in ACC Admin first.";
+            if (!string.IsNullOrEmpty(title))
+                return $"APS error ({statusCode}): {title}";
+        }
+        catch { }
+        return $"HTTP {statusCode}";
     }
 
     // Strips the "b." / "a." Data Management prefix -- Issues API expects raw UUID.
@@ -113,23 +133,17 @@ public class AccIssuesService
             throw new InvalidOperationException("Not connected. Sign in first.");
     }
 
-    private static string RegionHeader()
-    {
-        var region = AppSettings.Load().Region;
-        return string.IsNullOrWhiteSpace(region) ? "US" : region;
-    }
-
     private async Task<T?> GetJsonAsync<T>(string url, CancellationToken ct)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        request.Headers.Add("x-ads-region", RegionHeader());
         using var response = await _http.SendAsync(request, ct);
 
         if (!response.IsSuccessStatusCode)
         {
             var body = await response.Content.ReadAsStringAsync(ct);
             _log.Error(LogCategory, $"GET {url} -> {(int)response.StatusCode}: {body}");
-            response.EnsureSuccessStatusCode();
+            var friendly = ExtractApsError(body, (int)response.StatusCode);
+            throw new HttpRequestException(friendly);
         }
 
         var json = await response.Content.ReadAsStringAsync(ct);
