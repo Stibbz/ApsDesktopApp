@@ -73,20 +73,21 @@ public class ApsDataService
         EnsureConnected();
         var url = $"{HubsUrl}/{Uri.EscapeDataString(hubId)}/projects/"
                   + $"{Uri.EscapeDataString(projectId)}/topFolders";
-        var response = await GetJsonAsync<DataApiEnvelope>(url, cancellationToken);
-        return ExtractFolders(response);
+        var envelope = await GetAllPagesAsync(url, cancellationToken);
+        return ExtractFolders(envelope);
     }
 
     // Lists one folder's contents: its subfolders and the files (items) inside
     // it, with each file's latest-version metadata resolved from "included".
+    // Paginates automatically (page[limit]=200) so large folders are fully loaded.
     public async Task<FolderContents> GetFolderContentsAsync(
         string projectId, string folderId, CancellationToken cancellationToken)
     {
         EnsureConnected();
         var url = $"{DataUrl}/projects/{Uri.EscapeDataString(projectId)}/folders/"
                   + $"{Uri.EscapeDataString(folderId)}/contents";
-        var response = await GetJsonAsync<DataApiEnvelope>(url, cancellationToken);
-        return new FolderContents(ExtractFolders(response), ExtractFiles(response));
+        var envelope = await GetAllPagesAsync(url, cancellationToken);
+        return new FolderContents(ExtractFolders(envelope), ExtractFiles(envelope));
     }
 
     // Lists an item's full version history (newest first). Same JSON:API shape
@@ -98,23 +99,20 @@ public class ApsDataService
         EnsureConnected();
         var url = $"{DataUrl}/projects/{Uri.EscapeDataString(projectId)}/items/"
                   + $"{Uri.EscapeDataString(itemId)}/versions";
-        var response = await GetJsonAsync<DataApiEnvelope>(url, cancellationToken);
+        var envelope = await GetAllPagesAsync(url, cancellationToken);
 
         var versions = new List<VersionEntry>();
-        if (response is not null)
+        foreach (var resource in envelope.Data)
         {
-            foreach (var resource in response.Data)
-            {
-                if (resource.Type != "versions")
-                    continue;
-                var a = resource.Attributes;
-                versions.Add(new VersionEntry(
-                    VersionNumber: a.VersionNumber ?? 0,
-                    FileType: a.FileType ?? string.Empty,
-                    SizeBytes: a.StorageSize ?? 0,
-                    LastModified: a.LastModifiedTime,
-                    ModifiedBy: a.LastModifiedUserName ?? string.Empty));
-            }
+            if (resource.Type != "versions")
+                continue;
+            var a = resource.Attributes;
+            versions.Add(new VersionEntry(
+                VersionNumber: a.VersionNumber ?? 0,
+                FileType: a.FileType ?? string.Empty,
+                SizeBytes: a.StorageSize ?? 0,
+                LastModified: a.LastModifiedTime,
+                ModifiedBy: a.LastModifiedUserName ?? string.Empty));
         }
 
         versions.Sort((x, y) => y.VersionNumber.CompareTo(x.VersionNumber));
@@ -175,6 +173,32 @@ public class ApsDataService
                 TipVersionUrn: tipId ?? string.Empty));
         }
         return files;
+    }
+
+    // Fetches all pages of a JSON:API endpoint using page[number] / page[limit]
+    // pagination, accumulating data[] and included[] across pages. Stops when a
+    // page returns fewer items than the limit (i.e. the last page).
+    private async Task<DataApiEnvelope> GetAllPagesAsync(string baseUrl, CancellationToken cancellationToken)
+    {
+        var accumulated = new DataApiEnvelope();
+        const int pageLimit = 200;
+        int pageNumber = 0;
+
+        while (true)
+        {
+            var separator = baseUrl.Contains('?') ? '&' : '?';
+            var url = $"{baseUrl}{separator}page[number]={pageNumber}&page[limit]={pageLimit}";
+            var page = await GetJsonAsync<DataApiEnvelope>(url, cancellationToken);
+            if (page is null || page.Data.Count == 0) break;
+
+            accumulated.Data.AddRange(page.Data);
+            accumulated.Included.AddRange(page.Included);
+
+            if (page.Data.Count < pageLimit) break;
+            pageNumber++;
+        }
+
+        return accumulated;
     }
 
     // Issues an authenticated GET and deserializes the JSON body. The bearer

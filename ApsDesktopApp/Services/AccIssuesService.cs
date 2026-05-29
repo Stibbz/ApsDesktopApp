@@ -88,6 +88,7 @@ public class AccIssuesService
         {
             Content = content
         };
+        request.Headers.Add("x-ads-region", RegionHeader());
         using var response = await _http.SendAsync(request, ct);
 
         if (!response.IsSuccessStatusCode)
@@ -112,9 +113,16 @@ public class AccIssuesService
             throw new InvalidOperationException("Not connected. Sign in first.");
     }
 
+    private static string RegionHeader()
+    {
+        var region = AppSettings.Load().Region;
+        return string.IsNullOrWhiteSpace(region) ? "US" : region;
+    }
+
     private async Task<T?> GetJsonAsync<T>(string url, CancellationToken ct)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.Add("x-ads-region", RegionHeader());
         using var response = await _http.SendAsync(request, ct);
 
         if (!response.IsSuccessStatusCode)

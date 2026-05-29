@@ -15,7 +15,8 @@ namespace ApsDesktopApp.Services;
 public class ApsAuthService
 {
     private const string AuthorizeUrl = "https://developer.api.autodesk.com/authentication/v2/authorize";
-    private const string TokenUrl = "https://developer.api.autodesk.com/authentication/v2/token";
+    private const string TokenUrl     = "https://developer.api.autodesk.com/authentication/v2/token";
+    private const string RevokeUrl    = "https://developer.api.autodesk.com/authentication/v2/revoke";
     // offline_access is REQUIRED for APS to issue a refresh_token; without it
     // the token response has no refresh_token and EnsureValidAccessTokenAsync
     // can only ever sign out once the 1-hour access token expires.
@@ -80,10 +81,37 @@ public class ApsAuthService
         return token;
     }
 
+    // Clears the local token immediately. Call before or after RevokeTokenAsync;
+    // sign-out must never be blocked by a failed revocation call.
     public void SignOut()
     {
         CurrentToken = null;
         _tokenStorage.Clear();
+    }
+
+    // Best-effort server-side revocation of the refresh token.
+    // Swallows all exceptions so a network error never blocks sign-out.
+    public async Task RevokeTokenAsync(CancellationToken cancellationToken)
+    {
+        if (CurrentToken?.RefreshToken is not { Length: > 0 } refreshToken) return;
+        if (!IsConfigured) return;
+
+        try
+        {
+            var form = new Dictionary<string, string>
+            {
+                ["token"] = refreshToken,
+                ["token_type_hint"] = "refresh_token",
+                ["client_id"] = _settings.ClientId,
+            };
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            await _http.PostAsync(RevokeUrl, new FormUrlEncodedContent(form), cts.Token);
+        }
+        catch
+        {
+            // Revocation is best-effort; a timeout or network failure must not block sign-out.
+        }
     }
 
     // Returns a non-expired access token, refreshing if needed. On refresh

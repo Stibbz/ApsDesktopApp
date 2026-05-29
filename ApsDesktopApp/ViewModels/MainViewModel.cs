@@ -141,8 +141,10 @@ public partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand(CanExecute = nameof(CanDisconnect))]
-    private void Disconnect()
+    private async Task DisconnectAsync()
     {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(6));
+        await _auth.RevokeTokenAsync(cts.Token);
         _auth.SignOut();
         UserDisplayName = string.Empty;
         CurrentTool = null;

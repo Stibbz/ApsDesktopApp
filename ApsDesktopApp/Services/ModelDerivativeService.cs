@@ -21,16 +21,12 @@ public class ModelDerivativeService
 
     private readonly HttpClient _http;
     private readonly AppLogger  _log;
-    private AppSettings _settings;
 
     public ModelDerivativeService(HttpClient http, AppLogger log)
     {
         _http = http;
         _log  = log;
-        _settings = AppSettings.Load();
     }
-
-    public void ReloadSettings() => _settings = AppSettings.Load();
 
     // Submits a translation job for the given version URN.
     // outputFormat is the APS format token: "ifc", "dwg", "obj", "stl", "svf2", etc.
@@ -131,8 +127,12 @@ public class ModelDerivativeService
     }
 
     // APS accepts "US", "EMEA", or "APAC"; default to US if unset.
-    private string RegionHeader() =>
-        string.IsNullOrWhiteSpace(_settings.Region) ? "US" : _settings.Region;
+    // Loaded fresh each call so region changes in Settings take effect without restart.
+    private static string RegionHeader()
+    {
+        var region = AppSettings.Load().Region;
+        return string.IsNullOrWhiteSpace(region) ? "US" : region;
+    }
 
     // Throws with the APS error body included so the status message is useful.
     private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken ct)

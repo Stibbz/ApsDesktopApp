@@ -23,6 +23,8 @@ Grows tool-by-tool; sole user now, intended for colleague distribution later.
   for a future headless/web variant. Only ViewModels/Views reference UI types.
 - **`AppSettings` is not DI-injected**: call `AppSettings.Load()` directly in any service or
   ViewModel that needs settings; call `.Save()` after mutating. Cheap (small JSON file).
+  **Never cache it in a field** -- a `_settings` field + `ReloadSettings()` that goes unwired
+  creates a silent stale-settings bug (region, client ID, etc. won't update after Settings dialog).
 - **MVVM via CommunityToolkit.Mvvm source generators**: `[ObservableProperty]`
   on private fields, `[RelayCommand]` on methods. No manual INotifyPropertyChanged.
 - **DI in `App.xaml.cs`** (Microsoft.Extensions.DependencyInjection). `StartupUri`
@@ -55,6 +57,7 @@ Grows tool-by-tool; sole user now, intended for colleague distribution later.
 - Redirect URI: `http://localhost:8080/callback` (must match the portal exactly).
 - Config + tokens live in `%APPDATA%\ApsDesktopApp` (settings.json, tokens.dat).
 - Tokens are DPAPI-encrypted (CurrentUser scope) — not portable between machines.
+- **Server-side revocation**: `POST /authentication/v2/revoke` with `token=<refresh_token>&token_type_hint=refresh_token&client_id=<id>`. Best-effort (5s timeout, exceptions swallowed). `ApsAuthService.RevokeTokenAsync()` handles this; `DisconnectCommand` calls it before `SignOut()`. The internal `SignOut()` on refresh failure does NOT revoke (error path, no network guarantee).
 
 ## Model Derivative API
 - Requires a **separate "Server-side Web App" APS app** in the portal — the "Desktop/Mobile/SPA"
@@ -76,6 +79,7 @@ Grows tool-by-tool; sole user now, intended for colleague distribution later.
 - Contents is JSON:API: `data[]` mixes `type` "folders"/"items"; a file's
   metadata (version, size, modified-by) lives in `included[]` "versions",
   joined via the item's `relationships.tip.data.id`.
+- **Pagination uses JSON:API convention**: `page[number]` (0-based) + `page[limit]` (max 200) -- NOT `offset`/`limit`. `GetAllPagesAsync()` in `ApsDataService` handles this for all three endpoints (topFolders, folder contents, item versions).
 
 ## ACC Admin API
 - Project members endpoint: `GET /construction/admin/v1/projects/{projectId}/users` -- **no account ID in the path**.
@@ -83,6 +87,7 @@ Grows tool-by-tool; sole user now, intended for colleague distribution later.
 - Requires `account:read` scope on the 3-legged token. Without it, APS returns 404 (not 401/403) even for Project Admins.
 - Adding a scope to `ApsAuthService.Scopes` takes effect only after the user signs out and back in -- token refresh reuses the old scope set.
 - Ground-truth endpoint URLs: check `github.com/autodesk-platform-services/aps-sdk-net` samples + generated source before assuming a URL from prose docs.
+- **Construction Issues API accepts `x-ads-region`** -- send it (from `AppSettings.Load().Region`) on every GET and PATCH, same as `ModelDerivativeService`. Default to `"US"` if unset.
 
 ## Layout
 - `Models/` — DTOs (TokenInfo, UserProfile)
