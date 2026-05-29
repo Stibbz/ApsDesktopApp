@@ -370,3 +370,4 @@ FodyWeavers.xsd
 # Deploy output (DLLs built by post-build target — addin files are tracked)
 deploy/**/*.dll
 deploy/**/*.pdb
+AppData.lnk
