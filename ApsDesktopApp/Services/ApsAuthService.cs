@@ -63,9 +63,21 @@ public class ApsAuthService
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromMinutes(2));
 
-        var callbackTask = server.WaitForCallbackAsync(timeout.Token);
+        var callbackTask = server.WaitForCallbackAsync(expectedState, timeout.Token);
 
-        OpenBrowser(BuildAuthorizeUrl(challenge, expectedState));
+        try
+        {
+            OpenBrowser(BuildAuthorizeUrl(challenge, expectedState));
+        }
+        catch (Exception ex)
+        {
+            // No default browser / policy restriction. Shut the listener down
+            // (and observe its task) so the port is not left bound for 2 minutes.
+            timeout.Cancel();
+            try { await callbackTask; } catch { /* cancelled listener */ }
+            throw new InvalidOperationException(
+                "Could not open the browser for sign-in. Check your default browser settings.", ex);
+        }
 
         var callback = await callbackTask;
 
@@ -172,8 +184,9 @@ public class ApsAuthService
         using var response = await _http.PostAsync(TokenUrl, new FormUrlEncodedContent(form), cancellationToken);
         response.EnsureSuccessStatusCode();
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
-        return JsonSerializer.Deserialize<TokenInfo>(json)
+        var token = JsonSerializer.Deserialize<TokenInfo>(json)
             ?? throw new InvalidOperationException("Empty token response from APS.");
+        return ValidateTokenResponse(token);
     }
 
     private async Task<TokenInfo> ExchangeCodeForTokenAsync(string code, string verifier, CancellationToken cancellationToken)
@@ -190,8 +203,24 @@ public class ApsAuthService
         using var response = await _http.PostAsync(TokenUrl, new FormUrlEncodedContent(form), cancellationToken);
         response.EnsureSuccessStatusCode();
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
-        return JsonSerializer.Deserialize<TokenInfo>(json)
+        var token = JsonSerializer.Deserialize<TokenInfo>(json)
             ?? throw new InvalidOperationException("Empty token response from APS.");
+        return ValidateTokenResponse(token);
+    }
+
+    // APS rotates the refresh token on every refresh, so a response missing
+    // either token must be rejected here. TokenInfo defaults both to "", which
+    // would otherwise be silently persisted and brick the NEXT refresh in a way
+    // that is very hard to trace back (an empty refresh_token posted to APS).
+    private static TokenInfo ValidateTokenResponse(TokenInfo token)
+    {
+        if (string.IsNullOrEmpty(token.AccessToken))
+            throw new InvalidOperationException("APS token response contained no access_token.");
+        if (string.IsNullOrEmpty(token.RefreshToken))
+            throw new InvalidOperationException(
+                "APS token response contained no refresh_token. "
+                + "Check that the offline_access scope is granted.");
+        return token;
     }
 
     private void SetToken(TokenInfo token)

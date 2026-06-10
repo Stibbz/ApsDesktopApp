@@ -49,6 +49,9 @@ public partial class SettingsWindow : Window
 
     private void SelectRegion(string region)
     {
+        // Settings saved before the APAC->AUS rename still carry the old value.
+        if (region == "APAC")
+            region = "AUS";
         foreach (ComboBoxItem item in RegionBox.Items)
         {
             if ((item.Tag as string) == region)

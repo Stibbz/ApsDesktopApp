@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
@@ -9,6 +10,11 @@ namespace ApsDesktopApp.Services;
 // stored in plain text.
 public class SecretStorage
 {
+    private readonly AppLogger? _log;
+
+    // Logger is optional so non-DI construction (SettingsWindow) stays possible.
+    public SecretStorage(AppLogger? log = null) => _log = log;
+
     public void Save(string secret)
     {
         var bytes = Encoding.UTF8.GetBytes(secret);
@@ -28,8 +34,9 @@ public class SecretStorage
             var bytes = ProtectedData.Unprotect(encrypted, null, DataProtectionScope.CurrentUser);
             return Encoding.UTF8.GetString(bytes);
         }
-        catch
+        catch (Exception ex)
         {
+            _log?.Warn("SecretStorage", $"md_secret.dat unreadable -- secret unavailable: {ex.Message}");
             return null;
         }
     }

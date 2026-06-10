@@ -54,6 +54,9 @@ public class AccIssue
     [JsonPropertyName("createdAt")]
     public DateTimeOffset? CreatedAt { get; set; }
 
+    // Deliberately a string, unlike the sibling timestamps: the API returns a
+    // date-only "yyyy-MM-dd"; parsing to DateTimeOffset would invent a midnight
+    // time (and a timezone shift could move it to the wrong day).
     [JsonPropertyName("dueDate")]
     public string? DueDate { get; set; }
 

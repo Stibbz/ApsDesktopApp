@@ -20,8 +20,11 @@ public class OAuthCallbackServer
         public string? Error { get; init; }
     }
 
-    // Blocks (asynchronously) until the browser hits the callback or the token is cancelled.
-    public async Task<CallbackResult> WaitForCallbackAsync(CancellationToken cancellationToken)
+    // Blocks (asynchronously) until the browser hits the callback or the token is
+    // cancelled. expectedState is validated here, BEFORE the browser response is
+    // written, so the success page is never shown for a sign-in the app rejects.
+    public async Task<CallbackResult> WaitForCallbackAsync(
+        string expectedState, CancellationToken cancellationToken)
     {
         using var listener = new HttpListener();
         listener.Prefixes.Add($"http://localhost:{_port}/callback/");
@@ -45,14 +48,32 @@ public class OAuthCallbackServer
                 try { listener.Stop(); } catch { /* already stopping */ }
             });
 
-            var context = await listener.GetContextAsync();
+            HttpListenerContext context;
+            try
+            {
+                context = await listener.GetContextAsync();
+            }
+            catch (Exception ex) when (ex is HttpListenerException or ObjectDisposedException)
+            {
+                // Cancellation is implemented as listener.Stop(), which makes
+                // GetContextAsync throw a listener exception instead of an OCE.
+                // Translate it so callers see a normal cancellation.
+                cancellationToken.ThrowIfCancellationRequested();
+                throw;
+            }
             var request = context.Request;
 
             var code = request.QueryString["code"];
             var state = request.QueryString["state"];
             var error = request.QueryString["error"];
 
-            await WriteBrowserResponseAsync(context.Response, error);
+            var failureMessage = error;
+            if (failureMessage is null && state != expectedState)
+                failureMessage = "The sign-in response could not be verified (state mismatch).";
+            if (failureMessage is null && string.IsNullOrEmpty(code))
+                failureMessage = "No authorization code was returned.";
+
+            await WriteBrowserResponseAsync(context.Response, failureMessage);
 
             return new CallbackResult { Code = code, State = state, Error = error };
         }
@@ -63,11 +84,11 @@ public class OAuthCallbackServer
         }
     }
 
-    private static async Task WriteBrowserResponseAsync(HttpListenerResponse response, string? error)
+    private static async Task WriteBrowserResponseAsync(HttpListenerResponse response, string? failureMessage)
     {
-        var message = error is null
+        var message = failureMessage is null
             ? "<h2>Connected to Autodesk APS</h2><p>You can close this tab and return to the app.</p>"
-            : $"<h2>Sign-in failed</h2><p>{WebUtility.HtmlEncode(error)}</p><p>You can close this tab.</p>";
+            : $"<h2>Sign-in failed</h2><p>{WebUtility.HtmlEncode(failureMessage)}</p><p>You can close this tab.</p>";
 
         var html = $"<!DOCTYPE html><html><head><meta charset='utf-8'><title>APS Desktop App</title></head>" +
                    $"<body style='font-family:Segoe UI,sans-serif;text-align:center;margin-top:80px'>{message}</body></html>";

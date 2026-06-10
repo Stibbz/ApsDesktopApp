@@ -7,12 +7,15 @@ namespace ApsDesktopApp.ViewModels;
 // descriptor to MainViewModel.Tools.
 public class ToolDescriptor
 {
-    public ToolDescriptor(string name, string description, string badge, object viewModel)
+    // The IToolLifecycle constraint is deliberate: every tool MUST implement it,
+    // otherwise a forgotten interface would silently keep stale state across
+    // disconnects (the shell would have no Reset hook to call).
+    public ToolDescriptor(string name, string description, string badge, IToolLifecycle viewModel)
     {
         Name = name;
         Description = description;
         Badge = badge;
-        ViewModel = viewModel;
+        Lifecycle = viewModel;
     }
 
     public string Name { get; }
@@ -22,13 +25,16 @@ public class ToolDescriptor
     // so the .cs encoding hook is happy; no icon-font dependency.
     public string Badge { get; }
 
+    // The tool's ViewModel as its lifecycle interface (activate/reset hooks).
+    public IToolLifecycle Lifecycle { get; }
+
     // The tool's ViewModel; the shell binds a ContentControl to it and a
     // DataTemplate in MainWindow resolves the matching view.
-    public object ViewModel { get; }
+    public object ViewModel => Lifecycle;
 }
 
-// Optional hooks a tool ViewModel can implement to react to being opened
-// (load data on demand) or to a disconnect (clear state).
+// Hooks every tool ViewModel must implement to react to being opened
+// (load data on demand) and to a disconnect (clear state).
 public interface IToolLifecycle
 {
     Task ActivateAsync();

@@ -22,8 +22,11 @@ public enum ConnectionState
 // in MainWindow.xaml).
 public partial class MainViewModel : ObservableObject
 {
+    private const string LogCategory = "Shell";
+
     private readonly ApsAuthService _auth;
     private readonly ApsDataService _data;
+    private readonly AppLogger _log;
 
     // Raised when the user tries to connect before a Client ID is configured.
     // The View handles this by opening the Settings window (no MessageBox).
@@ -37,11 +40,13 @@ public partial class MainViewModel : ObservableObject
         ApsDataService data,
         ProjectContextViewModel projectContext,
         DataBrowserViewModel dataBrowser,
-        IssuesViewModel issues)
+        IssuesViewModel issues,
+        AppLogger log)
     {
         ProjectContext = projectContext;
         _auth = auth;
         _data = data;
+        _log = log;
 
         Tools.Add(new ToolDescriptor(
             "Data Browser",
@@ -58,7 +63,7 @@ public partial class MainViewModel : ObservableObject
             "IS", issues));
 
         if (_auth.HasStoredToken)
-            _ = InitializeFromStoredTokenAsync();
+            InitializeFromStoredTokenAsync().LogFaults(_log, LogCategory);
     }
 
     // -- Tool hub ----------------------------------------------------------
@@ -81,8 +86,7 @@ public partial class MainViewModel : ObservableObject
     private void OpenTool(ToolDescriptor tool)
     {
         CurrentTool = tool;
-        if (tool.ViewModel is IToolLifecycle lifecycle)
-            _ = lifecycle.ActivateAsync();
+        tool.Lifecycle.ActivateAsync().LogFaults(_log, LogCategory);
     }
 
     [RelayCommand]
@@ -131,7 +135,15 @@ public partial class MainViewModel : ObservableObject
             await LoadProfileAsync(cts.Token);
             State = ConnectionState.Connected;
             CurrentTool = null; // land on the home page
-            _ = ProjectContext.LoadAsync();
+            ProjectContext.LoadAsync().LogFaults(_log, LogCategory);
+        }
+        catch (OperationCanceledException)
+        {
+            // The 2-minute sign-in window elapsed (or the attempt was cancelled).
+            State = ConnectionState.Disconnected;
+            MessageBox.Show(
+                "Sign-in timed out or was cancelled. Try connecting again.",
+                "Sign-in failed", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         catch (Exception ex)
         {
@@ -150,7 +162,7 @@ public partial class MainViewModel : ObservableObject
         CurrentTool = null;
         ProjectContext.Reset();
         foreach (var tool in Tools)
-            (tool.ViewModel as IToolLifecycle)?.Reset();
+            tool.Lifecycle.Reset();
         State = ConnectionState.Disconnected;
     }
 
@@ -159,17 +171,25 @@ public partial class MainViewModel : ObservableObject
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-            await LoadProfileAsync(cts.Token);
-            if (!string.IsNullOrEmpty(UserDisplayName))
+            var profile = await _data.GetUserProfileAsync(cts.Token);
+            if (profile is null)
             {
-                State = ConnectionState.Connected;
-                CurrentTool = null;
-                _ = ProjectContext.LoadAsync();
+                // 401 even after the handler's forced refresh: the stored token
+                // is genuinely dead (revoked/expired refresh). Stay disconnected.
+                _log.Info(LogCategory, "Startup: stored token rejected; user must sign in again.");
+                return;
             }
+            UserDisplayName = profile.Name ?? profile.Email ?? "APS user";
+            State = ConnectionState.Connected;
+            CurrentTool = null;
+            ProjectContext.LoadAsync().LogFaults(_log, LogCategory);
         }
-        catch
+        catch (Exception ex)
         {
-            // Stored token unusable; stay disconnected and let the user reconnect.
+            // Transient failure (network down, APS hiccup): the token may still
+            // be fine, but we cannot verify it -- stay disconnected, keep the
+            // token so the next Connect can succeed, and leave a breadcrumb.
+            _log.Warn(LogCategory, $"Startup auto-signin failed (transient?): {ex.Message}");
         }
     }
 

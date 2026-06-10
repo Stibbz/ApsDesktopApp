@@ -11,6 +11,11 @@ namespace ApsDesktopApp.Services;
 // logged-in Windows account can decrypt them.
 public class TokenStorage
 {
+    private readonly AppLogger? _log;
+
+    // Logger is optional so non-DI construction stays possible; DI supplies it.
+    public TokenStorage(AppLogger? log = null) => _log = log;
+
     public void Save(TokenInfo token)
     {
         var json = JsonSerializer.SerializeToUtf8Bytes(token);
@@ -30,9 +35,11 @@ public class TokenStorage
             var json = ProtectedData.Unprotect(encrypted, null, DataProtectionScope.CurrentUser);
             return JsonSerializer.Deserialize<TokenInfo>(json);
         }
-        catch
+        catch (Exception ex)
         {
-            // Corrupt or undecryptable (e.g. copied from another machine) -> treat as no token.
+            // Corrupt or undecryptable (e.g. copied from another machine) -> treat as no token,
+            // but leave a breadcrumb so a surprise sign-out is explainable.
+            _log?.Warn("TokenStorage", $"tokens.dat unreadable -- treating as signed out: {ex.Message}");
             return null;
         }
     }

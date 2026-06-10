@@ -47,7 +47,12 @@ public class ApsAuthHandler : DelegatingHandler
         response.Dispose();
         using var retry = Clone(request);
         await ApplyTokenAsync(retry, auth, forceRefresh: true, cancellationToken);
-        return await base.SendAsync(retry, cancellationToken);
+        var second = await base.SendAsync(retry, cancellationToken);
+        if (second.StatusCode == HttpStatusCode.Unauthorized)
+            _log.Error(LogCategory,
+                $"Second consecutive 401 after forced refresh on {request.RequestUri?.AbsolutePath} "
+                + "-- access likely revoked or the app is not provisioned on this account.");
+        return second;
     }
 
     private static async Task ApplyTokenAsync(

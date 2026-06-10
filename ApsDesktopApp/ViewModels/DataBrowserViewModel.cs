@@ -16,10 +16,20 @@ namespace ApsDesktopApp.ViewModels;
 // projects in the menu-bar picker refreshes the tree automatically.
 public partial class DataBrowserViewModel : ObservableObject, IToolLifecycle
 {
+    private const string LogCategory = "DataBrowser";
+
     private readonly ApsDataService _data;
     private readonly NamingRuleEngine _namingRules;
     private readonly FileConverterViewModel _fileConverter;
     private readonly ProjectContextViewModel _projectContext;
+    private readonly AppLogger _log;
+
+    // Latest-call-wins guards: each load family cancels its predecessor so a
+    // slow older request can never repopulate the UI after a newer one (e.g.
+    // rapid project switching or fast file selection).
+    private CancellationTokenSource? _foldersCts;
+    private CancellationTokenSource? _filesCts;
+    private CancellationTokenSource? _versionsCts;
 
     // Raised when the user chooses to convert the selected file.
     public event Action? ConvertFileRequested;
@@ -28,14 +38,27 @@ public partial class DataBrowserViewModel : ObservableObject, IToolLifecycle
         ApsDataService data,
         NamingRuleEngine namingRules,
         FileConverterViewModel fileConverter,
-        ProjectContextViewModel projectContext)
+        ProjectContextViewModel projectContext,
+        AppLogger log)
     {
         _data           = data;
         _namingRules    = namingRules;
         _fileConverter  = fileConverter;
         _projectContext = projectContext;
+        _log            = log;
 
         _projectContext.PropertyChanged += OnProjectContextChanged;
+    }
+
+    // Cancels the previous load of a family and installs a fresh 30s-capped
+    // token source in its place.
+    private static CancellationTokenSource ReplaceCts(ref CancellationTokenSource? slot)
+    {
+        slot?.Cancel();
+        slot?.Dispose();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        slot = cts;
+        return cts;
     }
 
     // Exposed so DataBrowserView.xaml.cs can pass it as DataContext to the dialog.
@@ -91,6 +114,9 @@ public partial class DataBrowserViewModel : ObservableObject, IToolLifecycle
 
     public void Reset()
     {
+        _foldersCts?.Cancel();
+        _filesCts?.Cancel();
+        _versionsCts?.Cancel();
         Folders.Clear();
         NavigationPath.Clear();
         Files.Clear();
@@ -109,6 +135,12 @@ public partial class DataBrowserViewModel : ObservableObject, IToolLifecycle
     {
         if (e.PropertyName != nameof(ProjectContextViewModel.SelectedProject)) return;
 
+        // Cancel any in-flight loads so a slow response for the OLD project can
+        // never repopulate the collections we are about to clear.
+        _foldersCts?.Cancel();
+        _filesCts?.Cancel();
+        _versionsCts?.Cancel();
+
         Folders.Clear();
         NavigationPath.Clear();
         Files.Clear();
@@ -124,7 +156,7 @@ public partial class DataBrowserViewModel : ObservableObject, IToolLifecycle
             return;
         }
 
-        _ = LoadTopFoldersAsync();
+        LoadTopFoldersAsync().LogFaults(_log, LogCategory);
     }
 
     [RelayCommand]
@@ -145,13 +177,15 @@ public partial class DataBrowserViewModel : ObservableObject, IToolLifecycle
         var project = _projectContext.SelectedProject;
         if (project is null) return;
 
+        var cts = ReplaceCts(ref _foldersCts);
+
         IsLoadingFolders = true;
         ProjectsStatus = string.Empty;
         try
         {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             var folders = await _data.GetTopFoldersAsync(
                 project.HubId, project.ProjectId, cts.Token);
+            if (cts.Token.IsCancellationRequested) return; // superseded
 
             Folders.Clear();
             foreach (var folder in folders)
@@ -160,13 +194,22 @@ public partial class DataBrowserViewModel : ObservableObject, IToolLifecycle
             if (Folders.Count == 0)
                 ProjectsStatus = "No folders found in this project.";
         }
+        catch (OperationCanceledException) when (cts != _foldersCts)
+        {
+            // A newer load took over; leave the UI to it.
+        }
+        catch (OperationCanceledException)
+        {
+            ProjectsStatus = "Loading folders timed out.";
+        }
         catch (Exception ex)
         {
             ProjectsStatus = $"Could not load folders: {ex.Message}";
         }
         finally
         {
-            IsLoadingFolders = false;
+            if (cts == _foldersCts)
+                IsLoadingFolders = false;
         }
     }
 
@@ -185,10 +228,15 @@ public partial class DataBrowserViewModel : ObservableObject, IToolLifecycle
             foreach (var sub in contents.Folders)
                 folder.Children.Add(new FolderNode(sub, folder.ProjectId));
         }
-        catch
+        catch (Exception ex)
         {
+            // Reset IsLoaded so collapsing and re-expanding retries the fetch,
+            // and tell the user -- an empty node is indistinguishable from an
+            // empty folder otherwise.
             folder.Children.Clear();
             folder.IsLoaded = false;
+            _log.Warn(LogCategory, $"Expanding folder '{folder.Name}' failed: {ex.Message}");
+            ProjectsStatus = $"Could not expand '{folder.Name}': {ex.Message}";
         }
     }
 
@@ -227,6 +275,8 @@ public partial class DataBrowserViewModel : ObservableObject, IToolLifecycle
     // Core: fetch and populate the content panel for any FolderNode.
     private async Task LoadFolderContentsInternalAsync(FolderNode folder)
     {
+        var cts = ReplaceCts(ref _filesCts);
+
         IsLoadingFiles = true;
         FilesStatus = string.Empty;
         SelectedFile = null;
@@ -235,9 +285,9 @@ public partial class DataBrowserViewModel : ObservableObject, IToolLifecycle
         NamingStatus = string.Empty;
         try
         {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             var contents = await _data.GetFolderContentsAsync(
                 folder.ProjectId, folder.FolderId, cts.Token);
+            if (cts.Token.IsCancellationRequested) return; // superseded
 
             // Subfolders first (Explorer convention), then files.
             foreach (var sub in contents.Folders)
@@ -248,14 +298,25 @@ public partial class DataBrowserViewModel : ObservableObject, IToolLifecycle
             if (Files.Count == 0)
                 FilesStatus = "This folder is empty.";
         }
+        catch (OperationCanceledException) when (cts != _filesCts)
+        {
+            // A newer navigation took over; leave the UI to it.
+        }
+        catch (OperationCanceledException)
+        {
+            FilesStatus = "Loading contents timed out.";
+        }
         catch (Exception ex)
         {
             FilesStatus = $"Could not load contents: {ex.Message}";
         }
         finally
         {
-            IsLoadingFiles = false;
-            CheckNamingCommand.NotifyCanExecuteChanged();
+            if (cts == _filesCts)
+            {
+                IsLoadingFiles = false;
+                CheckNamingCommand.NotifyCanExecuteChanged();
+            }
         }
     }
 
@@ -298,7 +359,7 @@ public partial class DataBrowserViewModel : ObservableObject, IToolLifecycle
             VersionsStatus = string.Empty;
             return;
         }
-        _ = LoadVersionsAsync(value);
+        LoadVersionsAsync(value).LogFaults(_log, LogCategory);
     }
 
     private async Task LoadVersionsAsync(FileRow? file)
@@ -307,17 +368,28 @@ public partial class DataBrowserViewModel : ObservableObject, IToolLifecycle
         VersionsStatus = string.Empty;
         if (file is null) return;
 
+        var cts = ReplaceCts(ref _versionsCts);
+
         IsLoadingVersions = true;
         try
         {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             var versions = await _data.GetItemVersionsAsync(
                 file.ProjectId, file.ItemId, cts.Token);
+            if (cts.Token.IsCancellationRequested) return; // superseded
+
             foreach (var version in versions)
                 SelectedFileVersions.Add(new VersionRow(version));
 
             if (SelectedFileVersions.Count == 0)
                 VersionsStatus = "No version history available.";
+        }
+        catch (OperationCanceledException) when (cts != _versionsCts)
+        {
+            // A newer selection took over; leave the UI to it.
+        }
+        catch (OperationCanceledException)
+        {
+            VersionsStatus = "Loading versions timed out.";
         }
         catch (Exception ex)
         {
@@ -325,7 +397,8 @@ public partial class DataBrowserViewModel : ObservableObject, IToolLifecycle
         }
         finally
         {
-            IsLoadingVersions = false;
+            if (cts == _versionsCts)
+                IsLoadingVersions = false;
         }
     }
 }

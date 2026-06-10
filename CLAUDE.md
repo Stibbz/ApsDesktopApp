@@ -2,6 +2,8 @@
 
 WPF desktop platform for BIM coordination tools built on the Autodesk APS API.
 Grows tool-by-tool; sole user now, intended for colleague distribution later.
+`REVIEW.md` (repo root) holds the severity-ranked findings of the 2026-06-10 full review --
+check it before fixing/refactoring in those areas; remove entries as they are resolved.
 
 ## Build & Run
 - `dotnet build` — run from `C:\Users\sdraak\source\repos\ApsDesktopApp` (contains the .sln)
@@ -71,6 +73,13 @@ Grows tool-by-tool; sole user now, intended for colleague distribution later.
 - **Always send `x-ads-force: true`** on POST `/job` -- without it, APS returns HTTP 201 but
   silently skips adding a new format to an already-complete manifest (ACC auto-processes files
   to SVF on upload, so manifests are almost always pre-existing and complete).
+- **Derivative download uses the signedcookies flow** (the direct GET was decommissioned):
+  `GET .../manifest/{derivativeUrn}/signedcookies` returns a CloudFront URL + Set-Cookie values;
+  the second GET goes through a dedicated `HttpClient` with `UseCookies = false` -- the default
+  cookie container silently DROPS a manually set `Cookie` header.
+- **Region header is named `region`** (the legacy `x-ads-region` spelling is deprecated);
+  valid values US/EMEA/AUS/CAN/DEU/IND/JPN/GBR -- **APAC was renamed AUS**.
+  `ModelDerivativeService.RegionHeader()` maps a stored legacy "APAC" to "AUS".
 
 ## Data Management API
 - `topFolders` is under **project/v1** (`.../hubs/{h}/projects/{p}/topFolders`);
@@ -79,14 +88,16 @@ Grows tool-by-tool; sole user now, intended for colleague distribution later.
 - Contents is JSON:API: `data[]` mixes `type` "folders"/"items"; a file's
   metadata (version, size, modified-by) lives in `included[]` "versions",
   joined via the item's `relationships.tip.data.id`.
-- **Pagination uses JSON:API convention**: `page[number]` (0-based) + `page[limit]` (max 200) -- NOT `offset`/`limit`. `GetAllPagesAsync()` in `ApsDataService` handles this for all three endpoints (topFolders, folder contents, item versions).
+- **Pagination uses JSON:API convention**: `page[number]` (0-based) + `page[limit]` (max 200) -- NOT `offset`/`limit`. `GetAllPagesAsync()` in `ApsDataService` handles this for all three endpoints (topFolders, folder contents, item versions). Termination follows the response's `links.next` (the API's own signal) -- never the "short page" heuristic, which silently truncates if the server returns a non-full page mid-stream. ACC Issues/Admin use `offset`/`limit` and terminate on `pagination.totalResults`.
 
 ## ACC Admin API
 - Project members endpoint: `GET /construction/admin/v1/projects/{projectId}/users` -- **no account ID in the path**.
   The `/accounts/{accountId}/projects/...` shape does NOT exist and returns 404 silently.
 - Requires `account:read` scope on the 3-legged token. Without it, APS returns 404 (not 401/403) even for Project Admins.
 - Adding a scope to `ApsAuthService.Scopes` takes effect only after the user signs out and back in -- token refresh reuses the old scope set.
-- Ground-truth endpoint URLs: check `github.com/autodesk-platform-services/aps-sdk-net` samples + generated source before assuming a URL from prose docs.
+- Ground-truth endpoint URLs: check `github.com/autodesk-platform-services/aps-sdk-net` -- generated
+  clients live at `{module}/source/Http/*.gen.cs` (e.g. `modelderivative/source/Http/DerivativesApi.gen.cs`);
+  fetch via raw.githubusercontent.com. Trust these over prose docs.
 - **Do NOT send `x-ads-region` on Construction Issues API requests.** The Issues API resolves
   the regional server from the container ID internally; sending the header routes to the wrong
   regional deployment if the project's actual region differs from `AppSettings.Region`, causing 404.
@@ -110,8 +121,15 @@ Grows tool-by-tool; sole user now, intended for colleague distribution later.
 - `Views/LogViewerWindow.xaml` — non-modal log viewer, one instance per tool. Each tool
   code-behind holds a `_logWindow` field and a `ShowLogs_Click` handler. Button placed
   top-right of the tool's header row.
-- `ViewModels/IToolLifecycle` — interface every tool ViewModel implements: `ActivateAsync()`
-  (called when tool opens; lazy-loads data) and `Reset()` (called on disconnect; clears state).
+- `IToolLifecycle` (defined in `ViewModels/ToolDescriptor.cs`, not its own file) — interface every
+  tool ViewModel MUST implement: `ActivateAsync()` (tool opens; lazy-loads) and `Reset()` (disconnect;
+  clears state). `ToolDescriptor`'s constructor takes `IToolLifecycle`, so forgetting it is a compile error.
+- **Fire-and-forget tasks**: never `_ = SomethingAsync()`. Use
+  `SomethingAsync().LogFaults(_log, LogCategory)` (`Services/TaskExtensions.cs`) so an escaping
+  exception is logged instead of becoming a silent unobserved-task fault.
+- **Latest-call-wins loads**: ViewModels that reload on selection change (DataBrowser, Issues) keep a
+  `CancellationTokenSource` field per load family; each load cancels+replaces it and checks the token
+  before touching collections, so a slow stale response can't overwrite newer data.
 
 ## Styles
 - Valid `AppStyles.xaml` resource keys: `WindowBg`, `Surface`, `Elevated`, `Border`, `TextPri`,

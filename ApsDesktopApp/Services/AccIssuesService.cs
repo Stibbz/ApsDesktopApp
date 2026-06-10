@@ -61,7 +61,10 @@ public class AccIssuesService
             progress?.Report((all.Count, total < 0 ? 0 : total));
             _log.Debug(LogCategory, $"Page loaded: {all.Count}/{(total < 0 ? "?" : total)} issues");
 
-            if (response.Results.Count < PageSize) break;
+            // Terminate on the API's own signal (totalResults); the short-page
+            // heuristic is only a fallback for a response without pagination info.
+            if (total >= 0 && offset >= total) break;
+            if (total < 0 && response.Results.Count < PageSize) break;
 
             // Small pause to avoid hammering the rate limiter on large projects.
             await Task.Delay(100, ct);
@@ -97,8 +100,10 @@ public class AccIssuesService
         {
             var body = await response.Content.ReadAsStringAsync(ct);
             _log.Error(LogCategory, $"PATCH {issueId} failed {(int)response.StatusCode}: {body}");
+            // Same friendly-error translation as GetJsonAsync -- the raw body is
+            // already in the log; the user-facing message should be readable.
             throw new HttpRequestException(
-                $"Issue update failed ({(int)response.StatusCode}): {body}");
+                $"Issue update failed: {ExtractApsError(body, (int)response.StatusCode)}");
         }
     }
 

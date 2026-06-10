@@ -48,7 +48,12 @@
         <ComboBox Grid.Row="5" x:Name="RegionBox" Margin="0,0,0,16" HorizontalAlignment="Left" Width="200">
             <ComboBoxItem Content="US (United States)" Tag="US" />
             <ComboBoxItem Content="EMEA (Europe)" Tag="EMEA" />
-            <ComboBoxItem Content="APAC (Australia)" Tag="APAC" />
+            <ComboBoxItem Content="AUS (Australia)" Tag="AUS" />
+            <ComboBoxItem Content="CAN (Canada)" Tag="CAN" />
+            <ComboBoxItem Content="DEU (Germany)" Tag="DEU" />
+            <ComboBoxItem Content="IND (India)" Tag="IND" />
+            <ComboBoxItem Content="JPN (Japan)" Tag="JPN" />
+            <ComboBoxItem Content="GBR (United Kingdom)" Tag="GBR" />
         </ComboBox>
 
         <TextBlock Grid.Row="6" Margin="0,0,0,4">

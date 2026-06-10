@@ -19,6 +19,23 @@ public class DataApiEnvelope
 
     [JsonPropertyName("included")]
     public List<ApiResource> Included { get; set; } = new();
+
+    // JSON:API pagination links; "next" is absent on the final page and is the
+    // API's authoritative end-of-results signal (used by GetAllPagesAsync).
+    [JsonPropertyName("links")]
+    public ApiLinks? Links { get; set; }
+}
+
+public class ApiLinks
+{
+    [JsonPropertyName("next")]
+    public ApiLink? Next { get; set; }
+}
+
+public class ApiLink
+{
+    [JsonPropertyName("href")]
+    public string? Href { get; set; }
 }
 
 public class ApiResource

@@ -42,7 +42,12 @@ public class TwoLeggedAuthHandler : DelegatingHandler
         using var retry = Clone(request);
         retry.Headers.Authorization = new AuthenticationHeaderValue(
             "Bearer", await _tokens.GetTokenAsync(cancellationToken));
-        return await base.SendAsync(retry, cancellationToken);
+        var second = await base.SendAsync(retry, cancellationToken);
+        if (second.StatusCode == HttpStatusCode.Unauthorized)
+            _log.Error(LogCategory,
+                $"Second consecutive 401 after token re-fetch on {request.RequestUri?.AbsolutePath} "
+                + "-- check the Model Derivative app credentials/type in the APS portal.");
+        return second;
     }
 
     private static HttpRequestMessage Clone(HttpRequestMessage req)

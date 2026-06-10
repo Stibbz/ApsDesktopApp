@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text;
@@ -13,7 +14,7 @@ namespace ApsDesktopApp.Services;
 // Wraps the APS Model Derivative v2 API: start a translation job, poll its
 // manifest, and download a converted output file. WPF-free.
 // Unlike Data Management, this API IS region-routed -- every request carries
-// the x-ads-region header sourced from AppSettings. Uses the handler-authed client.
+// the "region" header sourced from AppSettings. Uses the handler-authed client.
 public class ModelDerivativeService
 {
     private const string Base = "https://developer.api.autodesk.com/modelderivative/v2/designdata";
@@ -52,7 +53,7 @@ public class ModelDerivativeService
         };
 
         using var request = new HttpRequestMessage(HttpMethod.Post, $"{Base}/job");
-        request.Headers.Add("x-ads-region", RegionHeader());
+        request.Headers.Add("region", RegionHeader());
         request.Headers.Add("x-ads-force", "true");
         request.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
 
@@ -77,7 +78,7 @@ public class ModelDerivativeService
 
         var urn = ToBase64Url(versionUrn);
         using var request = new HttpRequestMessage(HttpMethod.Get, $"{Base}/{urn}/manifest");
-        request.Headers.Add("x-ads-region", RegionHeader());
+        request.Headers.Add("region", RegionHeader());
 
         using var response = await _http.SendAsync(request, cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
@@ -105,7 +106,9 @@ public class ModelDerivativeService
     }
 
     // Downloads a specific derivative resource (identified by its child URN from
-    // the manifest) and returns the raw file bytes.
+    // the manifest) and returns the raw file bytes. Two-step flow: the direct
+    // GET .../manifest/{derivativeUrn} download was decommissioned, so first
+    // fetch signed CloudFront cookies, then GET the returned URL with them.
     public async Task<byte[]> DownloadDerivativeAsync(
         string versionUrn,
         string derivativeUrn,
@@ -116,22 +119,46 @@ public class ModelDerivativeService
         var urn = ToBase64Url(versionUrn);
         var encodedDerivative = Uri.EscapeDataString(derivativeUrn);
         using var request = new HttpRequestMessage(
-            HttpMethod.Get, $"{Base}/{urn}/manifest/{encodedDerivative}");
-        request.Headers.Add("x-ads-region", RegionHeader());
+            HttpMethod.Get, $"{Base}/{urn}/manifest/{encodedDerivative}/signedcookies");
+        request.Headers.Add("region", RegionHeader());
 
         using var response = await _http.SendAsync(request, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
-        var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        var url = JsonNode.Parse(json)?["url"]?.GetValue<string>();
+        if (string.IsNullOrEmpty(url))
+            throw new HttpRequestException("Signed-cookies response did not contain a download URL.");
+        if (!response.Headers.TryGetValues("Set-Cookie", out var setCookies))
+            throw new HttpRequestException("Signed-cookies response did not contain cookies.");
+
+        // The CloudFront host authenticates via the signed cookies, not the
+        // bearer token, so the second GET bypasses the authed client. Only the
+        // name=value part of each Set-Cookie is forwarded.
+        var cookieHeader = string.Join("; ", setCookies.Select(c => c.Split(';')[0]));
+        using var download = new HttpRequestMessage(HttpMethod.Get, url);
+        download.Headers.TryAddWithoutValidation("Cookie", cookieHeader);
+
+        using var downloadResponse = await DownloadClient.SendAsync(download, cancellationToken);
+        await EnsureSuccessAsync(downloadResponse, cancellationToken);
+        var bytes = await downloadResponse.Content.ReadAsByteArrayAsync(cancellationToken);
         _log.Info(LogCategory, $"DownloadDerivative: received {bytes.Length:N0} bytes");
         return bytes;
     }
 
-    // APS accepts "US", "EMEA", or "APAC"; default to US if unset.
+    // UseCookies=false is required: with the default cookie container enabled,
+    // HttpClientHandler silently drops a manually set Cookie header.
+    private static readonly HttpClient DownloadClient =
+        new(new HttpClientHandler { UseCookies = false });
+
+    // Valid regions per the SDK: US (default), EMEA, AUS, CAN, DEU, IND, JPN, GBR.
+    // "APAC" was renamed "AUS" -- mapped here so older settings.json files keep working.
     // Loaded fresh each call so region changes in Settings take effect without restart.
     private static string RegionHeader()
     {
         var region = AppSettings.Load().Region;
-        return string.IsNullOrWhiteSpace(region) ? "US" : region;
+        if (string.IsNullOrWhiteSpace(region)) return "US";
+        return region.Equals("APAC", StringComparison.OrdinalIgnoreCase) ? "AUS" : region;
     }
 
     // Throws with the APS error body included so the status message is useful.

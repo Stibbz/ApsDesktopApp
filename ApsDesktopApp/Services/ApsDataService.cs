@@ -33,6 +33,9 @@ public class ApsDataService
             throw new InvalidOperationException("Not connected. Sign in first.");
     }
 
+    // Returns null when the token is rejected (401/403 even after the handler's
+    // refresh-and-retry) so callers can treat it as "signed out". Other failures
+    // (network, 5xx) THROW -- they say nothing about token validity.
     public async Task<UserProfile?> GetUserProfileAsync(CancellationToken cancellationToken)
     {
         if (!_auth.HasStoredToken)
@@ -40,8 +43,10 @@ public class ApsDataService
 
         using var request = new HttpRequestMessage(HttpMethod.Get, UserInfoUrl);
         using var response = await _http.SendAsync(request, cancellationToken);
-        if (!response.IsSuccessStatusCode)
+        if (response.StatusCode is System.Net.HttpStatusCode.Unauthorized
+            or System.Net.HttpStatusCode.Forbidden)
             return null;
+        response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         return JsonSerializer.Deserialize<UserProfile>(json);
@@ -176,26 +181,29 @@ public class ApsDataService
     }
 
     // Fetches all pages of a JSON:API endpoint using page[number] / page[limit]
-    // pagination, accumulating data[] and included[] across pages. Stops when a
-    // page returns fewer items than the limit (i.e. the last page).
+    // pagination, accumulating data[] and included[] across pages. Follows the
+    // response's links.next until absent -- the API's own termination signal --
+    // rather than guessing from short pages (which would silently truncate if
+    // the server ever returned a non-final page below the limit).
     private async Task<DataApiEnvelope> GetAllPagesAsync(string baseUrl, CancellationToken cancellationToken)
     {
         var accumulated = new DataApiEnvelope();
         const int pageLimit = 200;
-        int pageNumber = 0;
 
-        while (true)
+        var separator = baseUrl.Contains('?') ? '&' : '?';
+        string? url = $"{baseUrl}{separator}page[number]=0&page[limit]={pageLimit}";
+
+        while (url is not null)
         {
-            var separator = baseUrl.Contains('?') ? '&' : '?';
-            var url = $"{baseUrl}{separator}page[number]={pageNumber}&page[limit]={pageLimit}";
             var page = await GetJsonAsync<DataApiEnvelope>(url, cancellationToken);
-            if (page is null || page.Data.Count == 0) break;
+            if (page is null) break;
 
             accumulated.Data.AddRange(page.Data);
             accumulated.Included.AddRange(page.Included);
 
-            if (page.Data.Count < pageLimit) break;
-            pageNumber++;
+            var next = page.Links?.Next?.Href;
+            // Guard against a malformed response pinning us to the same page.
+            url = next is not null && next != url ? next : null;
         }
 
         return accumulated;

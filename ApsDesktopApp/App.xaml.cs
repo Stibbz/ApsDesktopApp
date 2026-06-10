@@ -97,6 +97,10 @@ public partial class App : Application
 
         Services = services.BuildServiceProvider();
 
+        // Static fallback logger for AppSettings.Load(), which is deliberately
+        // not DI-injected (see CLAUDE.md) and so cannot receive the logger.
+        AppSettings.Logger = Services.GetRequiredService<AppLogger>();
+
         var window = Services.GetRequiredService<MainWindow>();
         window.Show();
     }

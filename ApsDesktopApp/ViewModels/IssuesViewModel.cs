@@ -33,6 +33,10 @@ public partial class IssuesViewModel : ObservableObject, IToolLifecycle
 
     private string? _loadedProjectId;
 
+    // Cancels the in-flight load when the project changes or the tool resets,
+    // so a slow older load can never populate the grid for the wrong project.
+    private CancellationTokenSource? _loadCts;
+
     // Shared project context -- also exposed to IssuesView.xaml for binding.
     public ProjectContextViewModel ProjectContext { get; }
 
@@ -58,6 +62,7 @@ public partial class IssuesViewModel : ObservableObject, IToolLifecycle
     {
         if (e.PropertyName != nameof(ProjectContextViewModel.SelectedProject)) return;
 
+        _loadCts?.Cancel();
         _allIssues.Clear();
         _memberIdToName        = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         _memberNameToId        = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -132,16 +137,21 @@ public partial class IssuesViewModel : ObservableObject, IToolLifecycle
             TotalCount  = p.total;
         });
 
+        _loadCts?.Cancel();
+        _loadCts?.Dispose();
+        var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+        _loadCts = cts;
+
         try
         {
-            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
-
             // Load issues and members concurrently.
             var issuesTask  = _issues.GetAllIssuesAsync(project.ProjectId, progress, cts.Token);
             var membersTask = _members.GetMemberLookupAsync(project.ProjectId, cts.Token);
             await Task.WhenAll(issuesTask, membersTask);
+            cts.Token.ThrowIfCancellationRequested();
 
-            _memberIdToName = membersTask.Result;
+            var memberResult = membersTask.Result;
+            _memberIdToName  = memberResult.Lookup;
             // Reverse lookup for import: name -> id (case-insensitive).
             foreach (var kv in _memberIdToName)
                 _memberNameToId.TryAdd(kv.Value, kv.Key);
@@ -152,8 +162,16 @@ public partial class IssuesViewModel : ObservableObject, IToolLifecycle
             foreach (var issue in issuesTask.Result)
                 _allIssues.Add(IssueRow.FromApi(issue, NameOf));
 
+            if (!memberResult.IsComplete)
+                Status = $"Member names unavailable ({memberResult.Error}) -- showing raw user IDs.";
+
             OnPropertyChanged(nameof(IssueCount));
             _log.Info(LogCategory, $"Loaded {_allIssues.Count} issues, {_memberIdToName.Count} members resolved");
+        }
+        catch (OperationCanceledException)
+        {
+            // Superseded by a project switch/reset, or the 5-minute cap elapsed.
+            _log.Info(LogCategory, "Issue load cancelled.");
         }
         catch (Exception ex)
         {
@@ -435,6 +453,7 @@ public partial class IssuesViewModel : ObservableObject, IToolLifecycle
 
     public void Reset()
     {
+        _loadCts?.Cancel();
         _allIssues.Clear();
         _memberIdToName        = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         _memberNameToId        = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
